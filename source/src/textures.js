@@ -112,7 +112,7 @@ export const Textures = {
     });
     const rough = canvasFrom(S, (i) => { const c = (0.45 + n[i] * 0.35) * 255; return [c, c, c]; });
     const bump = canvasFrom(S, (i) => { const c = m[i] * 255; return [c, c, c]; });
-    return { map: tex(col, 1, true), roughnessMap: tex(rough, 1), bumpMap: tex(bump, 1) };
+    return { map: tex(col, 2.5, true), roughnessMap: tex(rough, 2.5), bumpMap: tex(bump, 3) };
   }),
 
   tableTop: () => once('tableTop', () => {

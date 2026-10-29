@@ -4,8 +4,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { Textures } from './textures.js';
 
 export const TABLE_Y = 0.86;          // table top surface
-export const PLATE_T = 0.006;          // plate thickness
-export const JOINT = { x0: 0.215, x1: 0.385, z: 0.05, y: TABLE_Y + PLATE_T };
+export const PLATE_T = 0.006;          // default plate thickness
+export const JOINT = { x0: 0.215, x1: 0.385, z: 0.05, y: TABLE_Y + PLATE_T, t: PLATE_T, kind: 'butt' };
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -24,7 +24,7 @@ export function makeMaterials() {
     tube: new THREE.MeshStandardMaterial({ color: 0x2c3137, roughness: 0.55, metalness: 0.6, bumpMap: paint.bumpMap, bumpScale: 0.3 }),
     brass: new THREE.MeshStandardMaterial({ color: 0xd9a55c, roughness: 0.3, metalness: 1.0 }),
     copper: new THREE.MeshStandardMaterial({ color: 0xc7774a, roughness: 0.32, metalness: 1.0 }),
-    plate: new THREE.MeshStandardMaterial({ map: mill.map, roughnessMap: mill.roughnessMap, bumpMap: mill.bumpMap, bumpScale: 0.4, color: 0xffffff, roughness: 1, metalness: 0.75 }),
+    plate: new THREE.MeshStandardMaterial({ map: mill.map, roughnessMap: mill.roughnessMap, bumpMap: mill.bumpMap, bumpScale: 0.4, color: 0xa4aab0, roughness: 1, metalness: 0.7 }),
     plateEdge: new THREE.MeshStandardMaterial({ color: 0x9aa3ab, roughness: 0.3, metalness: 1.0, roughnessMap: brushed.roughnessMap }),
     tableTop: new THREE.MeshStandardMaterial({ map: top.map, roughnessMap: top.roughnessMap, bumpMap: top.bumpMap, bumpScale: 0.5, roughness: 1, metalness: 0.7 }),
     flux: new THREE.MeshStandardMaterial({ color: 0xb9b19a, roughness: 0.9, metalness: 0.0 }),
@@ -114,28 +114,32 @@ export function buildTable(M) {
   return g;
 }
 
-// ---------------- Plates (butt joint with tack welds) ----------------
-export function buildPlates(M) {
+// ---------------- Plates ----------------
+// kind: 'butt' (two plates, square butt joint with tack welds) | 'single' (one plate with a soapstone cut line)
+export function buildPlates(M, opts = {}) {
+  const T = opts.t ?? PLATE_T, kind = opts.kind || 'butt';
+  const R = kind === 'single' ? 0.035 : 0;   // cutting plate sits on two steel bars so the kerf is open underneath
+  JOINT.t = T; JOINT.y = TABLE_Y + R + T; JOINT.kind = kind;
   const g = new THREE.Group();
-  const L = 0.2, Wd = 0.08, gap = 0.0016;
-  const shape = (w) => {
-    const geo = new THREE.BoxGeometry(L, PLATE_T, w, 1, 1, 1);
-    return geo;
-  };
+  const L = 0.2, Wd = 0.08, gap = kind === 'butt' ? 0.0016 : 0;
   const mats = [M.plateEdge, M.plateEdge, M.plate, M.plateEdge, M.plateEdge, M.plateEdge];
-  const a = mesh(shape(Wd), mats); a.position.set(0.3, TABLE_Y + PLATE_T / 2, JOINT.z - gap / 2 - Wd / 2);
-  const b = mesh(shape(Wd), mats); b.position.set(0.3, TABLE_Y + PLATE_T / 2, JOINT.z + gap / 2 + Wd / 2);
-  // per-plate UV variation
-  b.geometry = b.geometry.clone();
-  const uv = b.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.9 + 0.3, uv.getY(i) * 0.6 + 0.4);
-  g.add(a, b);
-  // tack welds at both ends
-  const tackMat = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8 });
-  [0.205, 0.395].forEach(x => {
-    const t = mesh(new THREE.SphereGeometry(0.006, 16, 10), tackMat);
-    t.scale.set(1.3, 0.35, 0.9); t.position.set(x, JOINT.y + 0.0006, JOINT.z); g.add(t);
-  });
-  g.userData.plates = [a, b];
+  if (kind === 'butt') {
+    const a = mesh(new THREE.BoxGeometry(L, T, Wd), mats); a.position.set(0.3, TABLE_Y + T / 2, JOINT.z - gap / 2 - Wd / 2);
+    const b = mesh(new THREE.BoxGeometry(L, T, Wd), mats); b.position.set(0.3, TABLE_Y + T / 2, JOINT.z + gap / 2 + Wd / 2);
+    const uv = b.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.9 + 0.3, uv.getY(i) * 0.6 + 0.4);
+    g.add(a, b);
+    const tackMat = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8 });
+    [0.205, 0.395].forEach(x => {
+      const t = mesh(new THREE.SphereGeometry(0.006, 16, 10), tackMat);
+      t.scale.set(1.3, 0.35 * Math.max(0.6, T / 0.006), 0.9); t.position.set(x, JOINT.y + 0.0006, JOINT.z); g.add(t);
+    });
+  } else {
+    const a = mesh(new THREE.BoxGeometry(L, T, Wd * 2), mats); a.position.set(0.3, TABLE_Y + R + T / 2, JOINT.z);
+    g.add(a);
+    [-0.05, 0.05].forEach(dz => { const bar = mesh(new THREE.BoxGeometry(0.24, R, 0.025), M.darkSteel); bar.position.set(0.3, TABLE_Y + R / 2, JOINT.z + dz); g.add(bar); });
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(L - 0.02, 0.0008), new THREE.MeshStandardMaterial({ color: 0x9ea4a9, roughness: 0.95 }));
+    line.rotation.x = -Math.PI / 2; line.position.set(0.3, JOINT.y + 0.0002, JOINT.z); g.add(line);
+  }
   return g;
 }
 
@@ -348,7 +352,7 @@ export class Cable {
   }
   // a/b: world endpoints, da/db: unit directions the cable leaves each end
   update(a, da, b, db, opts = {}) {
-    const floorY = this.radius + 0.002;
+    const floorY = this.radius + 0.0005;
     const p = [];
     p.push(a.clone());
     p.push(a.clone().addScaledVector(da, 0.06));
@@ -381,9 +385,13 @@ export class Cable {
     }
     p.push(b.clone().addScaledVector(db, 0.07));
     p.push(b.clone());
-    const curve = new THREE.CatmullRomCurve3(p, false, 'centripetal', 0.5);
+    const rough = new THREE.CatmullRomCurve3(p, false, 'centripetal', 0.5);
+    // sample densely and keep every point resting on (never under) the floor
+    const pts = rough.getSpacedPoints(120);
+    for (const q of pts) if (q.y < floorY) q.y = floorY;
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.2);
     this.mesh.geometry.dispose();
-    this.mesh.geometry = new THREE.TubeGeometry(curve, 140, this.radius, 10, false);
+    this.mesh.geometry = new THREE.TubeGeometry(curve, 160, this.radius, 10, false);
   }
 }
 

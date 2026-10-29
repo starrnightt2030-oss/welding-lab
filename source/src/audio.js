@@ -24,14 +24,18 @@ export class ArcAudio {
     src.start(); this.hum.start();
   }
   // on: arc burning; arcK: arc length / diameter
-  update(on, arcK = 1) {
+  update(on, arcK = 1, mode = 'arc') {
     if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const target = on && this.enabled ? 0.55 + Math.random() * 0.35 : 0;
-    this.gain.gain.setTargetAtTime(target, t, 0.03);
-    this.humGain.gain.setTargetAtTime(on && this.enabled ? 0.025 : 0, t, 0.05);
-    // longer arc → harsher, higher hiss
-    this.bp.frequency.setTargetAtTime(1800 + Math.min(4, arcK) * 900, t, 0.1);
+    const t = this.ctx.currentTime, en = on && this.enabled;
+    let g = 0.55 + Math.random() * 0.35, f = 1800 + Math.min(4, arcK) * 900, hum = 0.025, hf = 100, q = 0.6;
+    if (mode === 'flame') { g = 0.32 + Math.random() * 0.05; f = 650; hum = 0; q = 0.35; }
+    else if (mode === 'cut') { g = 0.6; f = 1500; hum = 0; q = 0.3; }
+    else if (mode === 'tig') { g = 0.18 + Math.random() * 0.04; f = 4200; hum = 0.012; hf = 50; }
+    else if (mode === 'mig') { g = 0.45 + Math.random() * 0.4; f = 2200; hum = 0.06; hf = 110 + Math.random() * 30; }
+    this.gain.gain.setTargetAtTime(en ? g : 0, t, 0.03);
+    this.humGain.gain.setTargetAtTime(en ? hum : 0, t, 0.05);
+    this.hum.frequency.setTargetAtTime(hf, t, 0.02);
+    this.bp.frequency.setTargetAtTime(f, t, 0.1); this.bp.Q.setTargetAtTime(q, t, 0.1);
   }
   click() {
     if (!this.ctx || !this.enabled) return;
