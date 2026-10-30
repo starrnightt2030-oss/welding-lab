@@ -29,7 +29,7 @@ export function startApp(STATIONS) {
     station: null, stage: 'hub', done: store.get('done2', {}),
     explore: { sel: 0, labels: false, exploded: false },
     asm: { step: 0, picked: null, msg: null },
-    lens: true, assist: true, angle: 72, sound: true, control: E.isMobile ? 'rel' : 'direct',
+    lens: true, assist: store.get('level', 'beg') !== 'adv', level: store.get('level', 'beg'), angle: 72, sound: true, control: store.get('control', (E.isMobile || matchMedia('(pointer: coarse)').matches) ? 'sticks' : 'direct'),
     weld: { pressing: false, x: JOINT.x0, dist: 20, aux: false },
     report: null, showDef: false, drawer: true, op: {}, voice: voice.enabled
   };
@@ -369,7 +369,7 @@ export function startApp(STATIONS) {
     if (hold) { holdPointer(ev, 'down'); return; }
     if (clean && clean.active) { clean.pointer(ev, 'down'); return; }
     downAt = { x: ev.clientX, y: ev.clientY };
-    if (state.stage === 'weld') { cv.setPointerCapture(ev.pointerId); weldPointer(ev, 'down'); }
+    if (state.stage === 'weld' && state.control !== 'sticks') { cv.setPointerCapture(ev.pointerId); weldPointer(ev, 'down'); }
   });
   cv.addEventListener('pointermove', ev => { if (hold) { holdPointer(ev, 'move'); return; } if (clean && clean.active) { clean.pointer(ev, 'move'); return; } if (state.stage === 'weld' && state.weld.pressing) weldPointer(ev, 'move'); });
   cv.addEventListener('wheel', ev => { if (hold) { ev.preventDefault(); hold.zoom = THREE.MathUtils.clamp(hold.zoom * (ev.deltaY > 0 ? 0.92 : 1.08), 0.55, 2.2); } }, { passive: false });
@@ -427,8 +427,21 @@ export function startApp(STATIONS) {
     w.pressing = true;
   }
   let tipPos = new THREE.Vector3();
+  const LEVELS = { beg: 'مبتدئ', mid: 'متوسط', adv: 'متقدم' };
+  const LEVEL_TIP = {
+    beg: 'المستوى المبتدئ: الأداة تتحرك وحدها بالسرعة الصحيحة، وتتحكم أنت في المسافة فقط.',
+    mid: 'المستوى المتوسط: تتحكم في الحركة والمسافة، مع مساعدة في تثبيت المسافة.',
+    adv: 'المستوى المتقدم: تتحكم في كل شيء: الحركة والمسافة والزاوية، دون مساعدة.'
+  };
+  const CTRL_NAME = { sticks: 'تحكم بإصبعين', rel: 'تحكم دقيق', direct: 'تحكم مباشر' };
+  const CTRL_TIP = {
+    sticks: 'التحكم بإصبعين: الإبهام الأيسر للحركة على الخط، والإبهام الأيمن للمسافة.',
+    rel: 'التحكم الدقيق: اسحب إصبعك في أي مكان، فتنتقل الحركة إلى الأداة بهدوء.',
+    direct: 'التحكم المباشر: المس الخط نفسه.'
+  };
   function weldFrame(dt) {
     const s = S(), w = state.weld;
+    sticksFrame(dt);
     // smooth the finger input (removes touch jitter); in training mode keep the arc in a safe band
     const proc = sim.proc, mid = (proc.ideal.dist[0] + proc.ideal.dist[1]) / 2;
     if (!w.pressing) w.distS = null;
@@ -440,6 +453,15 @@ export function startApp(STATIONS) {
       if (sim.on) d = THREE.MathUtils.clamp(d, lo, hi);
     }
     w.eff = d;
+    // beginner: torch travels by itself at the right speed (waits for heat in gas welding/cutting); filler/cutting O2 automatic
+    if (state.level === 'beg' && w.pressing) {
+      const pr = sim.proc, v = (pr.ideal.speed[0] + pr.ideal.speed[1]) / 2, heatOK = !pr.heatNeed || sim.heatAt(w.autoX ?? w.x) >= pr.heatNeed;
+      if (w.autoX == null) w.autoX = Math.max(JOINT.x0, Math.min(sim.progress, JOINT.x1));
+      if (sim.on && heatOK) w.autoX += v / 1000 * dt;
+      w.x = w.autoX;
+      if (pr.aux && !w.auxHeld) w.aux = pr.kind === 'cut' ? heatOK : Math.sin(sim.time * 5.5) > 0.35;
+    } else if (!w.pressing) w.autoX = null;
+    if (state.level === 'mid' && w.pressing && sim.proc.fillerLen && !w.auxHeld) w.aux = Math.sin(sim.time * 5.5) > 0.35;
     const out = sim.step({ pressing: w.pressing, x: w.x, dist: d, angle: state.angle, aux: w.aux }, dt);
     if (out.msg) showToast(out.msg.t, out.msg.s);
     const target = V3(w.x, JOINT.y + (w.pressing && !sim.stuck ? Math.max(0.0003, d / 1000) : w.pressing ? 0.0002 : 0.025), JOINT.z);
@@ -451,8 +473,39 @@ export function startApp(STATIONS) {
     $('#lens').classList.toggle('on', lensOn);
     $('#lens').dataset.shade = sim.proc.lensShade || 'arc';
     E.renderer.toneMappingExposure = THREE.MathUtils.lerp(E.renderer.toneMappingExposure, lensOn ? (sim.proc.lensExposure ?? 0.28) : 1.12, 1 - Math.pow(0.001, dt));
-    updateHUD(out);
+    updateHUD(out); haptics(d, mid, out);
     if (out.progress >= 0.999 && !sim.on && !w.done) { w.done = true; showToast('good', 'أحسنت! اضغط «افحص» لترى النتيجة.'); }
+  }
+  // ---- two-thumb control (touch): left pad = travel along the joint, right pad = arc length (↕) + torch angle (↔)
+  const sticks = { L: null, R: null };
+  function bindSticks() {
+    const l = $('#stick-l'), r = $('#stick-r'); if (!r) return;
+    const bind = (el, key) => {
+      const set = ev => { const b = el.getBoundingClientRect(); sticks[key] = { x: THREE.MathUtils.clamp((ev.clientX - b.left) / b.width, 0, 1), y: THREE.MathUtils.clamp(1 - (ev.clientY - b.top) / b.height, 0, 1), id: ev.pointerId }; drawStick(el, sticks[key]); };
+      el.addEventListener('pointerdown', ev => { ev.preventDefault(); audio.ensure(); try { el.setPointerCapture(ev.pointerId); } catch (e) {} set(ev); if (key === 'R') { const w = state.weld; w.pid = ev.pointerId; } });
+      el.addEventListener('pointermove', ev => { if (sticks[key] && sticks[key].id === ev.pointerId) set(ev); });
+      const end = ev => { if (sticks[key] && sticks[key].id === ev.pointerId) { sticks[key] = null; drawStick(el, null); if (key === 'R') { state.weld.pressing = false; } } };
+      el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    };
+    if (l) bind(l, 'L'); bind(r, 'R');
+  }
+  function drawStick(el, v) { const k = el.querySelector('.knob'); if (!k) return; el.classList.toggle('on', !!v); if (el.id === 'stick-l') k.style.left = (v ? v.x * 100 : 50) + '%'; else { k.style.left = (v ? v.x * 100 : 50) + '%'; k.style.bottom = (v ? v.y * 100 : 50) + '%'; } }
+  function stickRange() { const p = sim.proc; return { max: p.breakAbove != null ? p.breakAbove + 1 : p.ideal.dist[1] * 2.2 }; }
+  function sticksFrame(dt) {
+    if (state.control !== 'sticks' || state.stage !== 'weld') return;
+    const w = state.weld, p = sim.proc, R = sticks.R, L = sticks.L;
+    if (R) {
+      if (!w.pressing) { w.x = Math.max(JOINT.x0, Math.min(sim.progress, JOINT.x1)); }
+      w.pressing = true; w.dist = R.y * stickRange().max;
+      if (p.angle !== false && state.level === 'adv') { state.angle = Math.round(40 + R.x * 50); const av = $('#angle-v'); if (av) av.textContent = state.angle + '°'; const a = $('#angle'); if (a) a.value = state.angle; }
+    }
+    if (L && w.pressing && state.level !== 'beg') { const v = (L.x - 0.5) * 2, vmax = p.ideal.speed[1] * 1.9; w.x = THREE.MathUtils.clamp(w.x + (Math.abs(v) < 0.06 ? 0 : v) * vmax / 1000 * dt, JOINT.x0 - 0.02, JOINT.x1 + 0.01); }
+  }
+  let lastBuzz = 0;
+  function haptics(d, mid, out) {
+    if (!navigator.vibrate || !state.weld.pressing) return;
+    const t = performance.now(), p = sim.proc, bad = (p.breakAbove != null && d > p.breakAbove - 1) || (p.stickBelow != null && d < p.stickBelow + 0.4) || sim.stuck;
+    if (bad && t - lastBuzz > 450) { lastBuzz = t; try { navigator.vibrate(sim.stuck ? 120 : 35); } catch (e) {} }
   }
   ctx.tipPos = () => tipPos;
   ctx.resetTip = (x, y) => tipPos.set(x, y, JOINT.z);
@@ -662,25 +715,30 @@ export function startApp(STATIONS) {
       ${proc.angle !== false ? `<div class="angle-ctl"><label for="angle">${proc.angleShort || 'الزاوية'}</label><input id="angle" type="range" min="30" max="90" value="${state.angle}" aria-label="${proc.angleName || 'زاوية الميل'}"><b class="mono" id="angle-v">${state.angle}°</b></div>` : ''}
       <div class="weld-tools">
         ${proc.lens !== false ? `<button type="button" class="btn ${state.lens ? 'on-green' : ''}" data-act="lens">${ICON.lens}<span>${proc.lensName || 'الماسك'}</span></button>` : ''}
-        <button type="button" class="btn ${state.control === 'rel' ? 'on' : ''}" data-act="control">${ICON.hand}<span>${state.control === 'rel' ? 'تحكم دقيق' : 'تحكم مباشر'}</span></button>
-        <button type="button" class="btn ${state.assist ? 'on' : ''}" data-act="assist">${ICON.target}<span>وضع التدريب</span></button>
+        <button type="button" class="btn" data-act="control">${ICON.hand}<span>${CTRL_NAME[state.control]}</span></button>
+        <div class="lvl" role="group" aria-label="مستوى الصعوبة">${Object.entries(LEVELS).map(([k, v]) => `<button type="button" class="${state.level === k ? 'on' : ''}" data-act="level:${k}">${v}</button>`).join('')}</div>
         ${proc.consumable ? `<button type="button" class="btn" data-act="new-consumable">${ICON.reset}<span>${proc.consumable.newName}</span></button>` : ''}
         <button type="button" class="btn primary" data-act="finish">افحص ${ICON.next}</button>
       </div>
-      ${proc.aux ? `<button type="button" class="aux-btn" id="aux-btn">${proc.aux.icon || ICON.plus}<span>${proc.aux.label}</span><small>${proc.aux.hint || 'اضغط واستمر'}</small></button>` : ''}
+      ${state.control === 'sticks' ? `<div class="sticks">
+        ${state.level !== 'beg' ? `<div id="stick-l" class="stick h"><span class="cap">الحركة على الخط</span><i class="rail"></i><b class="knob"></b><small class="lr"><span>رجوع</span><span>تقدّم</span></small></div>` : `<div class="stick-note">المستوى المبتدئ: الأداة تتحرك وحدها بالسرعة الصحيحة.<br>تحكّم أنت في ${proc.distName}.</div>`}
+        <div id="stick-r" class="stick xy"><span class="cap">${proc.distName}${proc.angle !== false && state.level === 'adv' ? ' + الزاوية' : ''}</span><i class="zone" style="bottom:${(proc.ideal.dist[0] / stickRange().max * 100).toFixed(1)}%;height:${((proc.ideal.dist[1] - proc.ideal.dist[0]) / stickRange().max * 100).toFixed(1)}%"></i><b class="knob"></b><small>المس لتبدأ • أعلى = أبعد</small></div>
+      </div>` : ''}
+      ${proc.aux && !(state.level === 'beg') && !(state.level === 'mid' && proc.fillerLen) ? `<button type="button" class="aux-btn ${state.control === 'sticks' ? 'near-l' : ''}" id="aux-btn">${proc.aux.icon || ICON.plus}<span>${proc.aux.label}</span><small>${proc.aux.hint || 'اضغط واستمر'}</small></button>` : ''}
       <div class="weld-bottom">
         <div class="prog"><span>${proc.kind === 'cut' ? 'تقدّم القطع' : 'تقدّم الخط'}</span><div class="bar"><i id="prog-i"></i></div><b class="mono" id="prog-v">0%</b></div>
         ${proc.consumable ? `<div class="elec"><span>${proc.consumable.name}</span><div class="bar"><i id="elec-i"></i></div><b class="mono" id="elec-v"></b></div>` : proc.heatNeed ? `<div class="elec"><span>التسخين</span><div class="bar heat"><i id="heat-i"></i></div><b class="mono" id="heat-v"></b></div>` : ''}
-        <div class="hint">${state.control === 'rel' ? 'المس أي مكان واسحب: يمينًا ويسارًا = الحركة على الخط، وأعلى وأسفل = ' + proc.distName + '. إصبعك لن يغطي العمل.' : proc.hint}</div>
+        <div class="hint">${state.control === 'sticks' ? 'الإبهام الأيمن على اللوحة اليمنى يشعل القوس ويتحكم في ' + proc.distName + '؛ اجعل النقطة داخل المنطقة الخضراء. والإبهام الأيسر يحرّك الأداة على الخط.' : state.control === 'rel' ? 'المس أي مكان واسحب: يمينًا ويسارًا = الحركة على الخط، وأعلى وأسفل = ' + proc.distName + '. إصبعك لن يغطي العمل.' : proc.hint}</div>
       </div>`;
     const a = $('#angle');
     if (a) a.addEventListener('input', () => { state.angle = +a.value; $('#angle-v').textContent = state.angle + '°'; });
     const ab = $('#aux-btn');
     if (ab) {
-      const on = e => { e.preventDefault(); state.weld.aux = true; ab.classList.add('on'); audio.ensure(); };
-      const off = () => { state.weld.aux = false; ab.classList.remove('on'); };
+      const on = e => { e.preventDefault(); state.weld.aux = true; state.weld.auxHeld = true; ab.classList.add('on'); audio.ensure(); };
+      const off = () => { state.weld.aux = false; state.weld.auxHeld = false; ab.classList.remove('on'); };
       ab.addEventListener('pointerdown', on); ab.addEventListener('pointerup', off); ab.addEventListener('pointercancel', off); ab.addEventListener('pointerleave', off);
     }
+    bindSticks(); document.body.classList.toggle('sticks-mode', state.control === 'sticks');
   }
   function gauge(id, val, txt, min, max, lo, hi) {
     const g = document.getElementById('g-' + id); if (!g) return;
@@ -750,7 +808,8 @@ export function startApp(STATIONS) {
     else if (a === 'asm-reset') goStage('assemble');
     else if (a === 'asm-auto') { if (!state.asm.busy) s.asmAuto(ctx); }
     else if (a === 'lens') { state.lens = !state.lens; renderHUD(); if (!state.lens) showToast('bad', 'تحذير: في الورشة يُمنع النظر إلى القوس أو اللهب دون قناع أو نظارة مناسبة. هذا للعرض فقط.'); }
-    else if (a === 'control') { state.control = state.control === 'rel' ? 'direct' : 'rel'; setAssist(state.assist); renderHUD(); showToast('info', state.control === 'rel' ? 'التحكم الدقيق: اسحب إصبعك في أي مكان، فتنتقل الحركة إلى الأداة بهدوء.' : 'التحكم المباشر: المس الخط نفسه.'); }
+    else if (a === 'control') { const o = ['sticks', 'rel', 'direct']; state.control = o[(o.indexOf(state.control) + 1) % 3]; store.set('control', state.control); setAssist(state.assist); renderHUD(); showToast('info', CTRL_TIP[state.control]); }
+    else if (a && a.startsWith('level:')) { state.level = a.slice(6); store.set('level', state.level); state.assist = state.level !== 'adv'; setAssist(state.assist); renderHUD(); showToast('info', LEVEL_TIP[state.level]); }
     else if (a === 'assist') { state.assist = !state.assist; setAssist(state.assist); renderHUD(); }
     else if (a === 'new-consumable') { sim.consumable = sim.proc.consumable.len; showToast('info', sim.proc.consumable.newMsg); }
     else if (a === 'finish') finishWeld();

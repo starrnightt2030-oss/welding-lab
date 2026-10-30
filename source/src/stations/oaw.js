@@ -57,7 +57,7 @@ S.parts = [
 S.exploreMap = { valveO: 'valves', valveA: 'valves', hoseO: 'hoses', hoseA: 'hoses', arrO: 'arrest', arrA: 'arrest', soap: 'lighter' };
 
 let ctxRef, cylO, cylA, regO, regA, arrO, arrA, hoseO, hoseA, torch, flame, chain, cart, lighter, rods, goggles, rod, soap, puff;
-const st = { task: 'weld', valveO: 0, valveA: 0, pO: 0, pA: 0, tA: 0, tO: 0, lit: false, leak: false, ppe: {} };
+const st = { task: 'weld', valveO: 0, valveA: 0, pO: 0, pA: 0, tA: 0, tO: 0, lit: false, leak: false, ppe: {}, fails: 0 };
 const asm = {};
 const CYL_O = V3(-0.86, 0.05, -0.1), CYL_A = V3(-0.53, 0.05, -0.1);
 
@@ -68,8 +68,9 @@ function buildTorch(M) {
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.2, metalness: 1, bumpMap: Textures.knurl().bumpMap, bumpScale: 0.8 });
   const handle = mesh(new THREE.CylinderGeometry(0.012, 0.013, 0.16, 24), chrome); handle.rotation.z = Math.PI / 2; handle.position.x = -0.08; g.add(handle);
   const body = mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.03, 20), M.brass); body.rotation.z = Math.PI / 2; body.position.x = -0.17; g.add(body);
+  const kns = {};
   [[0x1d5fb8, 1], [0xb3261e, -1]].forEach(([c, s]) => {
-    const kn = mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.012, 16), new THREE.MeshStandardMaterial({ color: c, roughness: 0.4 }));
+    const kn = kns[s > 0 ? 'O' : 'A'] = mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.012, 16), new THREE.MeshStandardMaterial({ color: c, roughness: 0.4 }));
     kn.position.set(-0.17, 0, s * 0.02); kn.rotation.x = Math.PI / 2; g.add(kn);
     const nip = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.03, 10), M.brass); nip.rotation.z = Math.PI / 2; nip.position.set(-0.2, 0, s * 0.007); g.add(nip);
   });
@@ -88,7 +89,7 @@ function buildTorch(M) {
   const ctip = mesh(new THREE.CylinderGeometry(0.0045, 0.0065, 0.025, 16), M.copper); ctip.position.set(0.18, -0.035, 0); cut.add(ctip);
   const lever = mesh(new RoundedBoxGeometry(0.1, 0.006, 0.014, 2, 0.002), M.steel); lever.position.set(0.05, 0.02, 0); lever.rotation.z = -0.08; cut.add(lever);
   cut.visible = false; g.add(cut);
-  g.userData = { weld, cut, lever, tipW: V3(0.178, -0.037, 0), tipC: V3(0.18, -0.048, 0), anchor: V3(-0.215, 0, 0) };
+  g.userData = { knO: kns.O, knA: kns.A, weld, cut, lever, tipW: V3(0.178, -0.037, 0), tipC: V3(0.18, -0.048, 0), anchor: V3(-0.215, 0, 0) };
   return g;
 }
 
@@ -209,6 +210,7 @@ function updateGauges() {
   regO.userData.lp.set(asm.regO && st.valveO ? st.pO : 0);
   regA.userData.lp.set(asm.regA && st.valveA ? st.pA : 0);
   regO.userData.screw.rotation.z = -st.pO * 0.6; regA.userData.screw.rotation.z = -st.pA * 2.4;
+  if (torch && torch.userData.knO) { torch.userData.knO.rotation.y = -st.tO * Math.PI * 2.5; torch.userData.knA.rotation.y = -st.tA * Math.PI * 2.5; }
   cylO.userData.valve.rotation.y = -st.valveO * Math.PI * 2; cylA.userData.valve.rotation.y = -st.valveA * Math.PI * 0.5;
 }
 function flameState() {
@@ -371,12 +373,48 @@ S.asmAuto = ctx => {
 
 // ----- operate (pressures, leak test, lighting sequence, flame adjustment)
 const REC = { weld: { O: [1.0, 2.0], A: [0.2, 0.5] }, cut: { O: [2.5, 4.0], A: [0.3, 0.6] } };
-S.operateEnter = ctx => { torch.position.copy(TORCH_HELD.p); torch.rotation.copy(TORCH_HELD.r); updateHoses(); updateGauges(); applyFlame(st.task === 'cut'); };
+S.operateEnter = ctx => { bindDials(ctx); torch.position.copy(TORCH_HELD.p); torch.rotation.copy(TORCH_HELD.r); updateHoses(); updateGauges(); applyFlame(st.task === 'cut'); };
 S.operatePick = (id, ctx) => {
   if (id === 'valveO') S.operateAction('valveO', null, ctx);
   else if (id === 'valveA') S.operateAction('valveA', null, ctx);
   else if (id === 'torch' && st.lit) { const c = ctx.E.camera; ctx.E.flyTo(V3(0.32, TABLE_Y + 0.32, 0.55), V3(0.15, TABLE_Y + 0.17, 0.2)); }
 };
+function dialHTML(k, label, v, cls) {
+  const turns = v * 1.25, ang = Math.min(1, v) * 300 - 150;
+  return `<div class="dial ${cls}" data-dial="${k}" role="slider" aria-label="${label}" aria-valuenow="${Math.round(v * 100)}" tabindex="0">
+    <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><path class="arc" d="${arcPath(Math.min(1, v))}"/><g transform="rotate(${ang} 50 50)"><circle cx="50" cy="50" r="30" class="cap"/>${[0, 45, 90, 135, 180, 225, 270, 315].map(a => `<rect x="48" y="21" width="4" height="9" rx="2" class="rib" transform="rotate(${a} 50 50)"/>`).join('')}<rect x="47" y="14" width="6" height="16" rx="3" class="ind"/></g></svg>
+    <b>${label}</b><small class="mono">${turns < 0.02 ? 'مغلق' : turns.toFixed(2) + ' لفة'}</small>
+    <span class="fine"><button type="button" data-op="nudge:${k}:-1" aria-label="أغلق قليلًا">−</button><button type="button" data-op="nudge:${k}:1" aria-label="افتح قليلًا">+</button></span></div>`;
+}
+function arcPath(f) { if (f <= 0.001) return ''; const a0 = -150 * Math.PI / 180 - Math.PI / 2, a1 = a0 + f * 300 * Math.PI / 180, r = 44; const p = a => [50 + r * Math.cos(a), 50 + r * Math.sin(a)]; const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0.toFixed(1)},${y0.toFixed(1)} A${r},${r} 0 ${f * 300 > 180 ? 1 : 0} 1 ${x1.toFixed(1)},${y1.toFixed(1)}`; }
+// finger drag on a dial = turning the valve (vertical drag, 220 px = fully open)
+let dialDrag = null;
+function bindDials(ctx) {
+  if (S._dialsBound) return; S._dialsBound = true;
+  document.addEventListener('pointerdown', ev => { const d = ev.target.closest('.dial'); if (!d || ev.target.closest('.fine')) return; ev.preventDefault(); dialDrag = { k: d.dataset.dial, y: ev.clientY, v0: st[d.dataset.dial], id: ev.pointerId }; });
+  document.addEventListener('pointermove', ev => { if (!dialDrag || ev.pointerId !== dialDrag.id) return; setValve(dialDrag.k, THREE.MathUtils.clamp(dialDrag.v0 + (dialDrag.y - ev.clientY) / 220, 0, dialDrag.k === 'tO' ? 1.4 : 1), ctxRef); });
+  document.addEventListener('pointerup', () => { if (dialDrag) { dialDrag = null; ctxRef.renderPanel(); } });
+}
+function setValve(k, v, ctx) {
+  const was = st[k]; st[k] = Math.round(v * 100) / 100;
+  if (Math.abs(was - st[k]) > 0.04) ctx.audio.sfx('hiss');
+  if (st.lit) checkFlame(ctx);
+  updateGauges(); applyFlame(st.task === 'cut');
+  // light update of the dial without re-rendering the whole panel (keeps the drag smooth)
+  const el = document.querySelector(`.dial[data-dial="${k}"]`);
+  if (el) { const tmp = document.createElement('div'); tmp.innerHTML = dialHTML(k, el.querySelector('b').textContent, st[k], el.classList.contains('a') ? 'a' : 'o'); el.replaceWith(tmp.firstElementChild); }
+  const fs = document.querySelector('.flame-state');
+  if (fs && st.lit) { const f = flameState(), ft = flameType(f.ratio); fs.className = 'flame-state ' + ft; fs.querySelector('b').textContent = FLAME_NAMES[ft]; }
+  clearTimeout(S._t); S._t = setTimeout(() => { if (!dialDrag) ctx.renderPanel(); }, 400);
+}
+// flame physics: flow too high → flame lifts off and blows out; too low → it burns back (pop) and goes out; too much oxygen → blows out
+function flameOut(ctx, msg) { st.lit = false; st.fails = (st.fails || 0) + 1; ctx.audio.sfx('pop'); ctx.toast('bad', msg); applyFlame(st.task === 'cut'); }
+function checkFlame(ctx) {
+  if (!st.lit) return;
+  if (st.tA > 0.72) return flameOut(ctx, 'انطفأ اللهب! كمية الأسيتيلين كبيرة جدًا فانفصل اللهب عن الفونية. أغلق الصمامات، ثم افتح الأسيتيلين قليلًا وأعد الإشعال.');
+  if (st.tA < 0.08) return flameOut(ctx, st.tO > 0.05 ? 'فرقعة وانطفاء! الأسيتيلين قليل جدًا بالنسبة للأكسجين فارتد اللهب. أغلق صمام الأكسجين، ثم أعد الإشعال.' : 'انطفأ اللهب لأنك أغلقت الأسيتيلين.');
+  if (st.tO / Math.max(0.05, st.tA) > 1.75) return flameOut(ctx, 'انطفأ اللهب بفرقعة! الأكسجين زائد جدًا. أغلق صمام الأكسجين، ثم أعد الإشعال وزِد الأكسجين ببطء.');
+}
 function pressOK(k) { const r = REC[st.task][k], v = k === 'O' ? st.pO : st.pA; return v >= r[0] && v <= r[1]; }
 S.operateHTML = () => {
   const f = flameState(), ft = f ? flameType(f.ratio) : null, r = REC[st.task];
@@ -401,19 +439,16 @@ S.operateHTML = () => {
       <p class="muted small">المناسب لـ${st.task === 'cut' ? 'القطع' : 'اللحام'}: الأكسجين ${r.O[0]}–${r.O[1]} بار، والأسيتيلين ${r.A[0]}–${r.A[1]} بار. ${st.pA > 1 ? '<b class="bad-t">خطر: الأسيتيلين فوق ١ بار!</b>' : ''}</p></section>
     <section class="card"><h3 class="sm">٣. اختبار التسرب</h3>
       <button type="button" class="btn ${st.leak ? 'on-green' : ''}" data-op="leak" ${st.pO && st.pA ? '' : 'disabled'}>${st.leak ? ICON.check + 'لا توجد فقاعات = لا يوجد تسريب' : 'رُشّ ماءً وصابونًا على الوصلات'}</button></section>
-    <section class="card"><h3 class="sm">٤. الإشعال وضبط اللهب</h3>
-      <div class="seg3">
-        <button type="button" class="${st.tA > 0 ? 'on' : ''}" data-op="openA">افتح أسيتيلين البوري</button>
-        <button type="button" class="${st.lit ? 'on' : ''}" data-op="light">ولّع بالولاعة</button>
-        <button type="button" class="${st.tO > 0 ? 'on' : ''}" data-op="openO">زوّد الأكسجين</button>
+    <section class="card torch-card"><h3 class="sm">٤. الإشعال وضبط اللهب</h3>
+      <p class="muted small">أدر مقبض الصمام بإصبعك (اسحب لأعلى للفتح ولأسفل للغلق). الترتيب: افتح الأسيتيلين قليلًا ← اقدح الولاعة ← زِد الأكسجين تدريجيًا حتى يصبح اللهب متعادلًا.</p>
+      <div class="dials">
+        ${dialHTML('tA', 'صمام الأسيتيلين', st.tA, 'a')}
+        <button type="button" class="striker ${st.lit ? 'lit' : ''}" data-op="light"><span class="spk"></span>${st.lit ? 'مشتعل' : 'اقدح الولاعة'}</button>
+        ${dialHTML('tO', 'صمام الأكسجين', st.tO, 'o')}
       </div>
-      ${st.lit ? `
-      <div class="lbl-row"><span>صمام الأسيتيلين في البوري</span><b class="mono">${Math.round(st.tA * 100)}%</b></div>
-      <input type="range" min="0.1" max="1" step="0.02" value="${st.tA}" data-op="tA" aria-label="صمام الأسيتيلين">
-      <div class="lbl-row"><span>صمام الأكسجين في البوري</span><b class="mono">${Math.round(st.tO * 100)}%</b></div>
-      <input type="range" min="0" max="1.3" step="0.02" value="${st.tO}" data-op="tO" aria-label="صمام الأكسجين">
-      <div class="flame-pick">${['carb', 'neutral', 'oxid'].map(k => `<span class="${ft === k ? 'on' : ''}">${{ carb: 'مكربن', neutral: 'متعادل', oxid: 'مؤكسد' }[k]}</span>`).join('')}</div>
-      <p class="small">${ft ? FLAME_NAMES[ft] + (ft === 'neutral' ? ': المخروط الداخلي واضح وحاد، ولا توجد ريشة. هذا هو المطلوب للصلب.' : ft === 'carb' ? ': توجد ريشة بيضاء حول المخروط الداخلي. زِد الأكسجين حتى تختفي الريشة.' : ': المخروط الداخلي قصير ومدبب وصوت اللهب عالٍ. قلّل الأكسجين.') : ''}</p>` : '<p class="muted small">الترتيب: أسيتيلين البوري ← الإشعال ← الأكسجين.</p>'}
+      <div class="flame-state ${st.lit ? ft : 'off'}"><b>${st.lit ? FLAME_NAMES[ft] : (st.tA > 0 ? 'الأسيتيلين يخرج… اقدح الآن' : 'اللهب مطفأ')}</b>
+      <span>${!st.lit ? (st.tO > 0.02 ? 'تنبيه: صمام الأكسجين مفتوح! أغلقه قبل الإشعال.' : 'افتح صمام الأسيتيلين من ربع إلى نصف لفة.') : st.tO < 0.02 ? 'لهب أصفر يتصاعد منه سخام أسود. افتح الأكسجين ببطء.' : ft === 'neutral' ? 'المخروط الداخلي واضح وحاد، ولا توجد ريشة. هذا هو المطلوب للصلب.' : ft === 'carb' ? 'توجد ريشة بيضاء حول المخروط الداخلي. زِد الأكسجين حتى تختفي الريشة.' : 'المخروط الداخلي قصير ومدبب وصوت اللهب عالٍ. قلّل الأكسجين.'}</span></div>
+      ${st.fails ? `<p class="small muted">محاولات الإشعال الفاشلة: <b class="mono">${st.fails}</b></p>` : ''}
       ${st.lit ? `<button type="button" class="btn" data-op="off">${ICON.x}أطفئ (الأسيتيلين أولًا ثم الأكسجين)</button>` : ''}
     </section>
     <section class="card"><h3 class="sm">مهمات الوقاية</h3>
@@ -434,10 +469,15 @@ S.operateAction = (op, el, ctx) => {
   else if (op === 'leak') { st.leak = true; say('good', 'رششت ماءً وصابونًا على جميع الوصلات. لا توجد فقاعات؛ الوصلات سليمة.'); }
   else if (op === 'openA') { if (!(st.valveA && st.pA > 0)) say('bad', 'لا يصل أسيتيلين إلى البوري. افتح صمام الأسطوانة واضبط الضغط أولًا.'); else { st.tA = 0.35; say('info', 'فتحت أسيتيلين البوري حوالي ربع لفة. أشعل فورًا بالولاعة.'); } }
   else if (op === 'light') {
-    if (st.tO > 0 && !st.lit) say('bad', 'خطأ وخطر! نُشعل الأسيتيلين وحده أولًا، وليس والأكسجين مفتوح.');
-    else if (!(st.tA > 0)) say('bad', 'افتح أسيتيلين البوري أولًا، ثم أشعل.');
-    else { st.lit = true; ctx.audio.sfx('pop'); say('good', 'تم الإشعال! اللهب أصفر ودخاني (أسيتيلين فقط). زِد الأكسجين تدريجيًا.'); ctx.E.flyTo(V3(0.32, TABLE_Y + 0.32, 0.55), V3(0.15, TABLE_Y + 0.17, 0.2)); }
+    ctx.audio.sfx('chip');
+    if (st.lit) { /* already burning */ }
+    else if (!(st.valveA && st.pA > 0) || !(st.tA > 0.02)) say('bad', 'شرارة بلا لهب: لا يخرج أسيتيلين. افتح صمام الأسيتيلين في البوري أولًا.');
+    else if (st.tO > 0.05) { st.fails = (st.fails || 0) + 1; ctx.audio.sfx('pop'); say('bad', 'فرقعة خطيرة! أشعلت والأكسجين مفتوح. أغلق صمام الأكسجين تمامًا، وأشعل الأسيتيلين وحده.'); }
+    else if (st.tA > 0.65) { st.fails = (st.fails || 0) + 1; say('bad', 'اشتعل اللهب ثم انفصل عن الفونية وانطفأ: الأسيتيلين مفتوح أكثر من اللازم. قلّله إلى ربع أو نصف لفة.'); }
+    else if (st.tA < 0.1) { st.fails = (st.fails || 0) + 1; ctx.audio.sfx('pop'); say('bad', 'اشتعل اللهب ضعيفًا ثم ارتد بفرقعة وانطفأ: الأسيتيلين قليل جدًا. افتحه أكثر قليلًا.'); }
+    else { st.lit = true; ctx.audio.sfx('pop'); say('good', 'تم الإشعال! اللهب أصفر ويتصاعد منه سخام. الآن افتح الأكسجين تدريجيًا.'); ctx.E.flyTo(V3(0.32, TABLE_Y + 0.32, 0.55), V3(0.15, TABLE_Y + 0.17, 0.2)); }
   }
+  else if (op.startsWith('nudge:')) { const [, k, d] = op.split(':'); setValve(k, THREE.MathUtils.clamp(st[k] + (+d) * 0.02, 0, k === 'tO' ? 1.4 : 1), ctx); return; }
   else if (op === 'openO') { if (!st.lit) say('bad', 'لا يصح فتح أكسجين البوري قبل الإشعال.'); else if (!(st.valveO && st.pO > 0)) say('bad', 'لا يصل أكسجين. افتح صمام الأسطوانة واضبط الضغط.'); else { st.tO = Math.max(st.tO, 0.2); say('info', 'الآن زِد الأكسجين من الشريط حتى تختفي الريشة البيضاء.'); } }
   else if (op === 'off') { st.lit = false; st.tA = 0; st.tO = 0; say('info', 'تم الإطفاء: أغلقت الأسيتيلين أولًا، ثم الأكسجين.'); }
   else if (op.startsWith('ppe:')) { const k = op.slice(4); st.ppe[k] = !st.ppe[k]; ctx.audio.click(); }
@@ -455,7 +495,18 @@ S.operateReady = () => {
   if (!neutral) return { ok: true, label: 'ابدأ (اللهب غير متعادل!)' };
   return { ok: true, label: st.task === 'cut' ? 'ابدأ القطع' : 'ابدأ اللحام' };
 };
+const soot = [];
+function sootFrame(dt) {
+  if (!soot.length) { const m = new THREE.SpriteMaterial({ map: Textures.glowSprite(), color: 0x151210, transparent: true, opacity: 0.55, depthWrite: false }); for (let i = 0; i < 26; i++) { const sp = new THREE.Sprite(m.clone()); sp.visible = false; S.root.add(sp); soot.push({ sp, t: 0, v: new THREE.Vector3() }); } }
+  const on = flame.visible && st.lit && st.tO < 0.03;
+  for (const q of soot) {
+    if (q.t <= 0) { if (on && Math.random() < dt * 14) { const p = flame.getWorldPosition(new THREE.Vector3()); S.root.worldToLocal(p); q.sp.position.copy(p).add(V3(0.02, 0.01, 0)); q.v.set((Math.random() - 0.3) * 0.03, 0.08 + Math.random() * 0.06, (Math.random() - 0.5) * 0.03); q.t = 1.6; q.sp.visible = true; } else continue; }
+    q.t -= dt; q.sp.position.addScaledVector(q.v, dt); const k = 1 - q.t / 1.6; q.sp.scale.setScalar(0.01 + k * 0.05); q.sp.material.opacity = 0.5 * (1 - k);
+    if (q.t <= 0) q.sp.visible = false;
+  }
+}
 S.frame = (ctx, dt) => {
+  sootFrame(dt);
   if (flame.visible) flame.userData.flicker(performance.now() / 1000);
   if (ctx.state.stage === 'operate') ctx.audio.update(st.lit, 1, 'flame');
 };

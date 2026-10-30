@@ -439,3 +439,47 @@ body.cleaning #hud,body.cleaning #coach{display:none}
 .brand-tx span{font-weight:600;color:var(--accent2);font-size:clamp(.82rem,1.4vw,1rem)}
 .brand-tx small{font:500 clamp(.62rem,1vw,.78rem) "IBM Plex Mono",monospace;color:#9fb2d0;letter-spacing:.02em}
 @media (max-aspect-ratio:1/1){.brand-blk{justify-content:center}}
+
+/* ---------- difficulty + two-thumb sticks ---------- */
+.lvl{display:flex;border-radius:.8rem;overflow:hidden;border:1px solid var(--line2);background:rgba(10,18,38,.9)}
+.lvl button{border:0;background:none;color:var(--text2);font:600 .82rem "IBM Plex Sans Arabic",sans-serif;padding:.55rem .7rem;cursor:pointer}
+.lvl button.on{background:var(--accent);color:#fff}
+.sticks{position:absolute;inset:auto 0 4.6rem 0;display:flex;justify-content:space-between;align-items:flex-end;padding:0 max(1rem,env(safe-area-inset-left));pointer-events:none;z-index:5;direction:ltr}
+.stick{position:relative;pointer-events:auto;touch-action:none;border-radius:1.2rem;background:rgba(10,18,38,.55);border:2px solid rgba(125,180,255,.35);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);user-select:none}
+.stick.on{border-color:var(--accent);background:rgba(20,40,80,.6)}
+.stick .cap{position:absolute;top:-1.5rem;left:0;right:0;text-align:center;font:600 .78rem "IBM Plex Sans Arabic",sans-serif;color:#dfe9ff;text-shadow:0 1px 3px #000;direction:rtl}
+.stick small{position:absolute;bottom:.35rem;left:0;right:0;text-align:center;font-size:.68rem;color:#9fb2d0;direction:rtl}
+.stick .knob{position:absolute;left:50%;bottom:50%;width:3rem;height:3rem;margin:0 0 -1.5rem -1.5rem;border-radius:50%;background:radial-gradient(circle at 35% 35%,#7db4ff,#1f63d1);box-shadow:0 4px 14px rgba(0,0,0,.5),0 0 0 3px rgba(255,255,255,.25);transition:left .08s,bottom .08s}
+.stick.h{width:min(15rem,34vw);height:5rem}
+.stick.h .rail{position:absolute;left:8%;right:8%;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:linear-gradient(90deg,#e4232a,#3a4a6a 45%,#3a4a6a 55%,#3ddc97)}
+.stick.xy{width:min(13rem,30vw);height:min(13rem,42vh)}
+.stick.xy .zone{position:absolute;left:6%;right:6%;border-radius:.5rem;background:rgba(61,220,151,.22);border:1px dashed rgba(61,220,151,.7)}
+.stick-note{pointer-events:none;max-width:15rem;font-size:.8rem;line-height:1.6;color:#dfe9ff;background:rgba(10,18,38,.7);padding:.6rem .8rem;border-radius:.8rem;direction:rtl}
+.aux-btn.near-l{left:max(1rem,env(safe-area-inset-left));right:auto;bottom:11.5rem}
+@media (max-height:540px){.sticks{bottom:3.6rem}.stick.xy{height:min(10rem,46vh)}.stick.h{height:4.2rem}.aux-btn.near-l{bottom:8.6rem}}
+body.sticks-mode .angle-ctl{display:none}
+.aux-btn.near-l{width:6rem;height:6rem;font-size:.8rem}
+body:not([data-stage=weld]) .sticks{display:none}
+.stick.xy .cap{top:.35rem;color:#cfe0ff;text-shadow:none;font-size:.72rem}
+.stick small.lr{display:flex;justify-content:space-between;padding:0 .7rem;direction:ltr}
+
+/* ---------- oxy-acetylene torch valves ---------- */
+.dials{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.6rem;margin:.6rem 0}
+.dial{display:flex;flex-direction:column;align-items:center;gap:.2rem;touch-action:none;user-select:none;cursor:ns-resize}
+.dial svg{width:min(7.5rem,100%);aspect-ratio:1}
+.dial .trk{fill:none;stroke:#24324F;stroke-width:6}
+.dial .arc{fill:none;stroke-width:6;stroke-linecap:round}
+.dial.a .arc{stroke:#e4232a}.dial.o .arc{stroke:#2f7ff0}
+.dial .cap{stroke:#0b0d12;stroke-width:2}
+.dial.a .cap{fill:#b3261e}.dial.o .cap{fill:#1d5fb8}
+.dial .rib{fill:rgba(255,255,255,.18)}.dial .ind{fill:#fff}
+.dial b{font-size:.82rem}.dial small{color:var(--muted)}
+.dial .fine{display:flex;gap:.3rem}.dial .fine button{width:2rem;height:1.8rem;border-radius:.5rem;border:1px solid var(--line2);background:var(--surface2);color:var(--text);font-size:1.1rem;cursor:pointer}
+.striker{width:5.2rem;height:5.2rem;border-radius:50%;border:3px solid #ffb347;background:radial-gradient(circle at 40% 35%,#3a2a12,#170f06);color:#ffd9a0;font:700 .78rem "IBM Plex Sans Arabic",sans-serif;cursor:pointer;position:relative;overflow:hidden}
+.striker:active .spk,.striker.lit .spk{opacity:1}
+.striker .spk{position:absolute;inset:0;background:radial-gradient(circle,#fff6 0,#ffb34755 30%,transparent 60%);opacity:0;transition:opacity .1s}
+.striker.lit{border-color:#7cc8ff;color:#bfe6ff}
+.flame-state{border-radius:.8rem;padding:.6rem .8rem;display:flex;flex-direction:column;gap:.2rem;background:var(--surface2);border-inline-start:4px solid #555}
+.flame-state span{font-size:.85rem;color:var(--text2);line-height:1.6}
+.flame-state.neutral{border-color:var(--good)}.flame-state.carb{border-color:#ffb020}.flame-state.oxid{border-color:var(--red)}.flame-state.off{border-color:#3a4a6a}
+.torch-card .dial svg{width:5.8rem!important;height:5.8rem!important;stroke:none}
