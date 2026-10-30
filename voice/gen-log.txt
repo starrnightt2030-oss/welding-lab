@@ -1,3 +1,9 @@
-edge-tts 7.3.1 ar-EG-ShakirNeural -6% -2Hz lines 1886
+edge-tts 7.3.1 ar-EG-ShakirNeural -6% -2Hz lines 1919
 probe ok 17280
-ok 1886 failed 0
+retry 1o472js NoAudioReceived NoAudioReceived('No audio was received. Please verify that your parameters are correct.')
+retry jncdka NoAudioReceived NoAudioReceived('No audio was received. Please verify that your parameters are correct.')
+retry 190rsom NoAudioReceived NoAudioReceived('No audio was received. Please verify that your parameters are correct.')
+retry 190rsom NoAudioReceived NoAudioReceived('No audio was received. Please verify that your parameters are correct.')
+retry 1du0u5k NoAudioReceived NoAudioReceived('No audio was received. Please verify that your parameters are correct.')
+retry j8fxbj NoAudioReceived NoAudioReceived('No audio was received. Please verify that your parameters are correct.')
+ok 1919 failed 0
