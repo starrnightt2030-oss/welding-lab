@@ -50,7 +50,11 @@ export class Voice {
     this.enabled = true; this.getCtx = getCtx; this.base = base;
     this.ids = null; this.buf = new Map(); this.queue = []; this.src = null; this.token = 0;
     this.last = ''; this.lastT = 0; this.busy = false; this.missing = new Set();
-    this.ready = fetch(base + 'index.json').then(r => r.ok ? r.json() : null).then(j => { this.ids = new Set(j && j.ids || []); }).catch(() => { this.ids = new Set(); });
+    // file:// (offline folder): fetch() is blocked, so the clip list comes from voice/index.js and clips play through <audio>
+    this.fileMode = location.protocol === 'file:';
+    this.ready = this.fileMode
+      ? new Promise(res => { const sc = document.createElement('script'); sc.src = base + 'index.js'; sc.onload = () => { this.ids = new Set((window.VOICE_INDEX && window.VOICE_INDEX.ids) || []); res(); }; sc.onerror = () => { this.ids = new Set(); res(); }; document.head.appendChild(sc); })
+      : fetch(base + 'index.json').then(r => r.ok ? r.json() : null).then(j => { this.ids = new Set(j && j.ids || []); }).catch(() => { this.ids = new Set(); });
     this.tts = 'speechSynthesis' in window; this.ttsVoice = null;
     if (this.tts) { const pick = () => { const vs = speechSynthesis.getVoices().filter(v => /^ar/i.test(v.lang)); this.ttsVoice = vs.find(v => /EG/i.test(v.lang)) || vs[0] || null; }; pick(); speechSynthesis.onvoiceschanged = pick; }
   }
@@ -74,6 +78,7 @@ export class Voice {
     return out;
   }
   async load(id) {
+    if (this.fileMode) return { file: this.base + id + '.mp3' };
     if (this.buf.has(id)) return this.buf.get(id);
     const ctx = this.getCtx && this.getCtx(); if (!ctx) return null;
     const pr = fetch(this.base + id + '.mp3').then(r => { if (!r.ok) throw 0; return r.arrayBuffer(); }).then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej))).catch(() => null);
@@ -103,6 +108,7 @@ export class Voice {
     if (tok === this.token) this.busy = false;
   }
   play(b, tok) {
+    if (b.file) return new Promise(res => { const a = this.el = new Audio(b.file); a.volume = 1; a.onended = a.onerror = () => res(); a.play().catch(() => res()); });
     const ctx = this.getCtx(); if (!ctx) return Promise.resolve();
     if (ctx.state === 'suspended') ctx.resume();
     return new Promise(res => {
@@ -123,6 +129,7 @@ export class Voice {
   stop() {
     this.token++; this.busy = false;
     if (this.src) { try { this.src.stop(); } catch (e) {} this.src = null; }
+    if (this.el) { try { this.el.pause(); } catch (e) {} this.el = null; }
     if (this.tts) speechSynthesis.cancel();
   }
 }

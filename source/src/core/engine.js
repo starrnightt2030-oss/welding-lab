@@ -47,7 +47,7 @@ export function createEngine(viewport) {
   composer.addPass(bloom);
   // selection = clean glowing outline around the part's silhouette (no tint over the part itself)
   const outline = new OutlinePass(new THREE.Vector2(256, 256), scene, camera);
-  outline.visibleEdgeColor.set(0xff7a00); outline.hiddenEdgeColor.set(0x7a3a00);
+  outline.visibleEdgeColor.set(0x3d9bff); outline.hiddenEdgeColor.set(0x16407a);
   outline.edgeStrength = 9; outline.edgeGlow = 0.35; outline.edgeThickness = 2.2; outline.pulsePeriod = 2.4; outline.enabled = false;
   composer.addPass(outline);
   composer.addPass(new OutputPass());

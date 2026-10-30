@@ -66,17 +66,39 @@ S.build = ctx => {
   const M = ctx.M, R = S.root;
   const T = TABLE_Y;
   const put = (id, o, p, r) => { o.position.copy(p); if (r) o.rotation.set(...r); o.userData.pick = id; items[id] = o; R.add(o); };
-  // display mat on the table
-  const mat = new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.56), new THREE.MeshStandardMaterial({ color: 0x23272d, roughness: 0.95, bumpMap: Textures.paint().bumpMap, bumpScale: 0.5 }));
-  mat.rotation.x = -Math.PI / 2; mat.position.set(0.3, T + 0.0015, 0); mat.receiveShadow = true; R.add(mat);
-  put('helmet', buildHelmet(), V3(0.04, T, -0.12), [0, 0.35, 0]);
-  put('shield', buildFaceShield(), V3(0.62, T, -0.14), [0, -0.4, 0]);
-  put('goggles', buildGoggles(), V3(0.24, T, -0.15), [0, 0.15, 0]);
-  put('glasses', buildGlasses(), V3(0.4, T, -0.16), [0, -0.1, 0]);
-  put('glovesL', buildGlove(0xb98a56), V3(0.08, T, 0.14), [0, 0.55, 0]);
-  put('glovesT', buildGlove(0xe2d6c2, true), V3(0.3, T, 0.16), [0, -0.2, 0]);
-  put('ear', buildEarPlugs(), V3(0.49, T, 0.08), [0, 0.3, 0]);
-  put('resp', buildRespirator(), V3(0.66, T, 0.14), [0, -0.5, 0]);
+  // wall tool board (pegboard): every item hangs on its own hook so it is easy to see and pick
+  const BX = 0.3, BY = 1.38, BZ = -0.5, BW = 1.56, BH = 1.0;
+  const pc = document.createElement('canvas'); pc.width = 1024; pc.height = 656;
+  { const c = pc.getContext('2d'); const g = c.createLinearGradient(0, 0, 0, 656); g.addColorStop(0, '#2c4f8f'); g.addColorStop(1, '#1d3a72'); c.fillStyle = g; c.fillRect(0, 0, 1024, 656);
+    for (let y = 18; y < 656; y += 26) for (let x = 18; x < 1024; x += 26) { c.fillStyle = 'rgba(5,10,25,.85)'; c.beginPath(); c.arc(x, y, 4.2, 0, 7); c.fill(); c.fillStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.arc(x + 1, y + 1.5, 4.2, 0, 3.2); c.fill(); }
+    c.fillStyle = '#e4232a'; c.fillRect(0, 0, 1024, 14); c.fillStyle = '#fff'; c.font = '700 34px "IBM Plex Sans Arabic",sans-serif'; c.textAlign = 'center'; c.direction = 'rtl';
+    c.fillText('لوحة مهمات الوقاية الشخصية', 512, 52); }
+  const ptex = new THREE.CanvasTexture(pc); ptex.colorSpace = THREE.SRGBColorSpace; ptex.anisotropy = 8;
+  if (document.fonts) document.fonts.ready.then(() => { const c = pc.getContext('2d'); c.fillStyle = '#244683'; c.fillRect(300, 20, 424, 44); c.fillStyle = '#fff'; c.font = '700 34px "IBM Plex Sans Arabic",sans-serif'; c.textAlign = 'center'; c.direction = 'rtl'; c.fillText('لوحة مهمات الوقاية الشخصية', 512, 52); ptex.needsUpdate = true; });
+  const board = mesh(new THREE.BoxGeometry(BW, BH, 0.02), [M.darkSteel, M.darkSteel, M.darkSteel, M.darkSteel, new THREE.MeshStandardMaterial({ map: ptex, roughness: 0.7, metalness: 0.15 }), M.darkSteel], false, true);
+  board.position.set(BX, BY, BZ); R.add(board);
+  const frameM = new THREE.MeshStandardMaterial({ color: 0x9aa3ad, roughness: 0.35, metalness: 0.9 });
+  [[0, BH / 2 + 0.015, BW + 0.06, 0.03], [0, -BH / 2 - 0.015, BW + 0.06, 0.03]].forEach(([x, y, w, h]) => { const f = mesh(new THREE.BoxGeometry(w, h, 0.04), frameM); f.position.set(BX + x, BY + y, BZ + 0.005); R.add(f); });
+  [-1, 1].forEach(sx => { const f = mesh(new THREE.BoxGeometry(0.03, BH + 0.06, 0.04), frameM); f.position.set(BX + sx * (BW / 2 + 0.015), BY, BZ + 0.005); R.add(f); });
+  // legs down to the floor
+  [-1, 1].forEach(sx => { const l = mesh(new THREE.BoxGeometry(0.04, BY - BH / 2, 0.04), frameM); l.position.set(BX + sx * (BW / 2 - 0.05), (BY - BH / 2) / 2, BZ); R.add(l); });
+  const hookM = new THREE.MeshStandardMaterial({ color: 0xd9dde2, roughness: 0.25, metalness: 1 });
+  const hook = (x, y) => { const h = new THREE.Group(); const a = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.07, 8), hookM); a.rotation.x = Math.PI / 2; a.position.z = 0.035; h.add(a); const b = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.03, 8), hookM); b.position.set(0, 0.012, 0.07); h.add(b); h.position.set(x, y, BZ + 0.01); R.add(h); };
+  // name tag under each item
+  const tag = (x, y, txt) => { const c = document.createElement('canvas'); c.width = 256; c.height = 56; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const d = () => { const q = c.getContext('2d'); q.fillStyle = '#f4f6f9'; q.fillRect(0, 0, 256, 56); q.fillStyle = '#0b1f4a'; q.font = '700 28px "IBM Plex Sans Arabic",sans-serif'; q.textAlign = 'center'; q.direction = 'rtl'; q.fillText(txt, 128, 38); t.needsUpdate = true; };
+    d(); if (document.fonts) document.fonts.ready.then(d);
+    const m = mesh(new THREE.PlaneGeometry(0.16, 0.035), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }), false, false); m.position.set(x, y, BZ + 0.012); R.add(m); };
+  const hang = (id, o, x, y, rot, name, ty) => { hook(x, y + 0.02); put(id, o, V3(x, y, BZ + 0.06), rot); tag(x, ty ?? y - 0.17, name); };
+  hang('helmet', buildHelmet(), BX - 0.56, BY + 0.12, [0, 0, 0], 'قناع اللحام', BY - 0.08);
+  hang('shield', buildFaceShield(), BX - 0.2, BY + 0.14, [0, 0, 0], 'واقي الوجه', BY - 0.08);
+  hang('goggles', buildGoggles(), BX + 0.1, BY + 0.3, [Math.PI / 2, 0, 0], 'نظارة الغاز', BY + 0.17);
+  hang('glasses', buildGlasses(), BX + 0.42, BY + 0.31, [Math.PI / 2, 0, 0], 'نظارة السلامة', BY + 0.17);
+  hang('ear', buildEarPlugs(), BX + 0.66, BY + 0.31, [Math.PI / 2, 0, 0], 'سدادات الأذن', BY + 0.17);
+  hang('glovesL', buildGlove(0xb98a56), BX - 0.5, BY - 0.3, [Math.PI / 2, 0, 0], 'قفاز جلدي', BY - 0.44);
+  hang('glovesT', buildGlove(0xe2d6c2, true), BX - 0.16, BY - 0.3, [Math.PI / 2, 0, 0], 'قفاز TIG', BY - 0.44);
+  hang('resp', buildRespirator(), BX + 0.2, BY - 0.28, [Math.PI / 2, 0, 0], 'كمامة الأبخرة', BY - 0.44);
+  // empty table in front
   // stand with jacket & apron
   const stand = new THREE.Group();
   const pole = mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.75, 12), M.tube); pole.position.y = 0.875; stand.add(pole);
@@ -126,8 +148,8 @@ S.partObject = id => items[id] && items[id].isObject3D ? items[id] : null;
 S.holdable = id => ['helmet', 'shield', 'goggles', 'glasses', 'glovesL', 'glovesT', 'ear', 'resp', 'boots', 'ext', 'jacket', 'apron'].includes(id);
 S.partAnchor = id => { const o = items[id]; const v = o.isObject3D ? o.getWorldPosition(new THREE.Vector3()) : o.position.clone(); if (id === 'jacket') v.y += 0.05; return v; };
 S.cams = {
-  explore: () => ({ pos: V3(0.55, 1.45, 1.6), target: V3(-0.1, 0.75, 0.0) }),
-  wear: () => ({ pos: V3(0.4, 1.5, 1.4), target: V3(-0.05, 0.85, 0.0) }),
+  explore: () => ({ pos: V3(0.3, 1.5, 1.95), target: V3(0.15, 1.18, -0.5) }),
+  wear: () => ({ pos: V3(0.3, 1.5, 1.95), target: V3(0.15, 1.18, -0.5) }),
   hazards: () => ({ pos: V3(0.9, 1.8, 2.1), target: V3(-0.25, 0.3, 0.1) })
 };
 

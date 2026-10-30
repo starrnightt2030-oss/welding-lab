@@ -8,6 +8,7 @@ import { AR } from '../data.js';
 import { ICON } from './icons.js';
 import { Voice } from './voice.js';
 import { runIntro, WELCOME } from '../intro.js';
+import { createCleaning } from './cleaning.js';
 import { HUB, INTRO } from '../voicescript.js';
 import { buildChippingHammer, buildWireBrush } from '../ppe.js';
 
@@ -32,7 +33,7 @@ export function startApp(STATIONS) {
     weld: { pressing: false, x: JOINT.x0, dist: 20, aux: false },
     report: null, showDef: false, drawer: true, op: {}, voice: voice.enabled
   };
-  let M, sim, plates, hammer, brush, platesOpts = '', booted = false;
+  let clean = null, M, sim, plates, hammer, brush, platesOpts = '', booted = false;
   const shared = {};
 
   const ctx = {
@@ -57,6 +58,7 @@ export function startApp(STATIONS) {
     shared.hammer = hammer; shared.brush = brush;
     setPlates({ t: 0.006, kind: 'butt' });
     sim = new WeldSim(E.scene);
+    clean = createCleaning({ E, audio, sim, hammer, brush, onChange: onClean });
     for (const S of STATIONS) {
       if (!S.ready) continue;
       S.root = new THREE.Group(); S.root.visible = false; E.scene.add(S.root);
@@ -96,7 +98,7 @@ export function startApp(STATIONS) {
     E.controls.enabled = true; E.controls.autoRotate = true; E.controls.autoRotateSpeed = 0.45;
     E.setHighlight([]);
     renderAll();
-    E.flyTo(V3(1.75, 1.55, 2.25), V3(0.1, 0.55, 0), 1.2);
+    E.flyTo(V3(1.7, 1.85, 2.5), V3(0.15, 1.1, -0.4), 1.2);
     if (booted) voice.say(HUB);
   }
   function leaveStage() {
@@ -106,6 +108,7 @@ export function startApp(STATIONS) {
     if (assist) { assist.visible = false; assist.userData.ring.visible = false; }
     $('#coach').classList.remove('on');
     if (hold) releaseHold(true);
+    if (clean) clean.stop(); renderClean();
     showDefects(false);
   }
   function goStage(st) {
@@ -129,12 +132,23 @@ export function startApp(STATIONS) {
       state.weld = { pressing: false, x: JOINT.x0 - 0.02, dist: 25, aux: false, rel: null };
       s.weldEnter && s.weldEnter(ctx);
       setAssist(state.assist);
+      state.prep = { clean: proc.kind === 'cut' ? 1 : 0, done: proc.kind === 'cut' };
+      if (!state.prep.done) clean.start('pre');
     }
-    if (st === 'inspect') { if (!state.report) state.report = sim.proc ? sim.evaluate() : null; s.inspectEnter && s.inspectEnter(ctx); }
+    if (st === 'inspect') {
+      if (!state.report) state.report = sim.proc ? sim.evaluate() : null; s.inspectEnter && s.inspectEnter(ctx);
+      state.showDef = false;
+      if (state.report && !state.report.empty) {
+        if (sim.proc.slag && sim.slagLeft() > 0.03) clean.start('chip');
+        else if (sim.proc.sound === 'mig' && sim.brushedFrac() < 0.85) clean.start('post');
+        else state.showDef = true;
+      }
+    }
     if (s.custom && s.custom[st] && s.custom[st].enter) s.custom[st].enter(ctx);
     renderAll();
     E.resize();
-    const cam = st === 'weld' ? weldCamera() : st === 'inspect' ? inspectCamera() : s.cams[st]();
+    const cam = st === 'weld' ? (clean.active ? cleanCamera() : weldCamera()) : st === 'inspect' ? (clean.active ? cleanCamera() : inspectCamera()) : s.cams[st]();
+    renderClean(); if (state.showDef) setTimeout(() => state.stage === 'inspect' && showDefects(true), 900);
     E.flyTo(cam.pos, cam.target, prev === st ? 0.01 : 1.2);
     const intro = INTRO[s.id] && INTRO[s.id][st];
     if (st === 'assemble') voice.say((intro ? intro + ' ' : '') + stepSpeech());
@@ -157,6 +171,33 @@ export function startApp(STATIONS) {
     const dist = Math.max(0.22, (0.25 / 2) / Math.tan(hf / 2));
     const t = V3(0.3, JOINT.y, JOINT.z - 0.004);
     return { pos: t.clone().addScaledVector(V3(0, 0.62, 0.78).normalize(), dist), target: t };
+  }
+  function cleanCamera() { return { pos: V3(0.3, JOINT.y + 0.27, JOINT.z + 0.17), target: V3(0.3, JOINT.y, JOINT.z) }; }
+  // ---- hands-on cleaning (wire brush before welding, chipping hammer + brush after)
+  const CLEAN_TXT = {
+    pre: ['نظّف مكان اللحام بالفرشاة السلكية', 'اسحب الفرشاة ذهابًا وإيابًا على حواف الوصلة حتى يختفي الصدأ ويظهر المعدن لامعًا.'],
+    chip: ['أزل الخبث بمطرقة التكسير', 'اطرق على خط اللحام من بدايته إلى نهايته حتى يتكسر الخبث كله.'],
+    post: ['نظّف خط اللحام بالفرشاة السلكية', 'اسحب الفرشاة على الخط لإزالة بقايا الخبث والرذاذ، ثم افحص العيوب.']
+  };
+  function renderClean() {
+    const el = $('#clean-ui'); if (!el) return;
+    const k = clean && clean.active ? clean.kind : null; el.hidden = !k; document.body.classList.toggle('cleaning', !!k);
+    if (!k) return;
+    const [t, h] = CLEAN_TXT[k], pr = Math.round(clean.prog * 100);
+    el.innerHTML = `<div class="cl-ic">${k === 'chip' ? ICON.hammer : ICON.hand}</div><div class="cl-tx"><b>${t}</b><span>${h}</span><div class="bar" dir="ltr"><i style="width:${pr}%"></i></div></div><button type="button" class="btn sm" data-act="clean-skip">${k === 'pre' ? 'ابدأ اللحام دون تنظيف' : 'تخطَّ'}</button>`;
+  }
+  function onClean(e) {
+    if (e.prog != null && !e.done) { const b = document.querySelector('#clean-ui .bar i'); if (b) b.style.width = Math.round(e.prog * 100) + '%'; return; }
+    if (e.done === 'pre') {
+      state.prep = { clean: clean.cleanFrac(), done: true };
+      showToast(state.prep.clean > 0.8 ? 'good' : 'bad', state.prep.clean > 0.8 ? 'ممتاز، أصبح سطح الوصلة نظيفًا. الآن ابدأ اللحام.' : 'لم يُنظَّف السطح جيدًا؛ قد تظهر مسامية في الخط.');
+      const c = weldCamera(); E.flyTo(c.pos, c.target, 0.8); E.controls.enabled = false;
+    } else if (e.done === 'chip') {
+      showToast('good', 'تمت إزالة الخبث. الآن نظّف الخط بالفرشاة.'); clean.start('post');
+    } else if (e.done === 'post') {
+      showToast('good', 'أصبح الخط نظيفًا. شاهد العيوب على الخط نفسه.'); state.showDef = true; const c = inspectCamera(); E.flyTo(c.pos, c.target, 0.8); setTimeout(() => showDefects(true), 700); renderPanel();
+    }
+    renderClean();
   }
   function inspectCamera() { return { pos: V3(0.3, JOINT.y + 0.24, 0.2), target: V3(0.3, JOINT.y, 0.05) }; }
 
@@ -326,13 +367,15 @@ export function startApp(STATIONS) {
   cv.addEventListener('pointerdown', ev => {
     audio.ensure(); tryLandscape();
     if (hold) { holdPointer(ev, 'down'); return; }
+    if (clean && clean.active) { clean.pointer(ev, 'down'); return; }
     downAt = { x: ev.clientX, y: ev.clientY };
     if (state.stage === 'weld') { cv.setPointerCapture(ev.pointerId); weldPointer(ev, 'down'); }
   });
-  cv.addEventListener('pointermove', ev => { if (hold) { holdPointer(ev, 'move'); return; } if (state.stage === 'weld' && state.weld.pressing) weldPointer(ev, 'move'); });
+  cv.addEventListener('pointermove', ev => { if (hold) { holdPointer(ev, 'move'); return; } if (clean && clean.active) { clean.pointer(ev, 'move'); return; } if (state.stage === 'weld' && state.weld.pressing) weldPointer(ev, 'move'); });
   cv.addEventListener('wheel', ev => { if (hold) { ev.preventDefault(); hold.zoom = THREE.MathUtils.clamp(hold.zoom * (ev.deltaY > 0 ? 0.92 : 1.08), 0.55, 2.2); } }, { passive: false });
   const up = ev => {
     if (hold) { holdPointer(ev, 'up'); return; }
+    if (clean && clean.active) { clean.pointer(ev, 'up'); return; }
     if (state.stage === 'weld') { if (state.weld.pid === ev.pointerId) { state.weld.pressing = false; state.weld.rel = null; } return; }
     if (!downAt) return;
     const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y); downAt = null;
@@ -434,26 +477,60 @@ export function startApp(STATIONS) {
   }
 
   // ---------------------------------------------------------------- inspect overlays
-  let defectGroup;
+  // defects drawn ON the bead: a coloured band over each stretch + a numbered marker you can tap for cause & fix
+  let defectGroup; const DCOL = [0xff4d4d, 0xffb020, 0x4da3ff, 0xc77dff, 0x3ddc97, 0xff7ab8, 0x00d1c1];
+  const defLayer = $('#defmarks'), _dp = new THREE.Vector3();
   function showDefects(on) {
     if (defectGroup) { E.scene.remove(defectGroup); defectGroup = null; }
-    if (!on || !state.report || !state.report.bins) return;
+    defLayer.innerHTML = ''; const card = $('#defcard'); if (card) card.hidden = true;
+    if (!on || !state.report || !state.report.defects) return;
     defectGroup = new THREE.Group();
-    const col = { good: 0x3ddc97, warn: 0xffb020, bad: 0xff6b5c };
-    state.report.bins.forEach(b => {
-      if (b.state === 'none') return;
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.0095, 0.004), new THREE.MeshBasicMaterial({ color: col[b.state], toneMapped: false }));
-      m.rotation.x = -Math.PI / 2; m.position.set(JOINT.x0 + b.i * 0.01 + 0.005, JOINT.y + 0.0003, JOINT.z + 0.016);
-      defectGroup.add(m);
-    });
+    const R = state.report, h = Math.max(0.0015, (R.height || 2) / 1000);
+    R.defects.forEach((d, i) => (d.spots || []).forEach((sp, j) => {
+      const len = Math.max(0.006, sp.x1 - sp.x0), col = DCOL[i % DCOL.length];
+      const band = new THREE.Mesh(new THREE.BoxGeometry(len, h * 1.4, 0.014), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.32, depthWrite: false, toneMapped: false }));
+      band.position.set((sp.x0 + sp.x1) / 2, JOINT.y + h * 0.5, JOINT.z); defectGroup.add(band);
+      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(band.geometry), new THREE.LineBasicMaterial({ color: col, toneMapped: false }));
+      edge.position.copy(band.position); defectGroup.add(edge);
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'defmark' + (sp.all ? ' all' : ''); b.dataset.act = 'def-focus'; b.dataset.i = i; b.dataset.j = j;
+      b.style.setProperty('--c', '#' + col.toString(16).padStart(6, '0'));
+      b.innerHTML = `<i>${AR(i + 1)}</i><span>${d.name}${sp.all ? ' — على طول الخط' : ''}</span>`;
+      b.userData = { x: (sp.x0 + sp.x1) / 2, y: JOINT.y + h * 1.6 }; b._pos = b.userData;
+      defLayer.appendChild(b);
+    }));
     E.scene.add(defectGroup);
+    updateDefMarks();
+  }
+  function updateDefMarks() {
+    if (!defLayer.children.length) return;
+    const w = viewport.clientWidth, hh = viewport.clientHeight;
+    [...defLayer.children].forEach((b, k) => {
+      _dp.set(b._pos.x, b._pos.y, JOINT.z).project(E.camera);
+      const vis = _dp.z < 1 && Math.abs(_dp.x) < 1.05 && Math.abs(_dp.y) < 1.05;
+      b.style.display = vis ? '' : 'none';
+      b.style.transform = `translate(${(_dp.x * 0.5 + 0.5) * w}px, ${(-_dp.y * 0.5 + 0.5) * hh - 18 - (k % 2) * 26}px)`;
+    });
+  }
+  function focusDefect(i, j) {
+    const R = state.report, d = R && R.defects[i]; if (!d) return;
+    if (!state.showDef) { state.showDef = true; showDefects(true); renderPanel(); }
+    const sp = (d.spots || [])[j] || (d.spots || [])[0];
+    if (sp) { const cx = (sp.x0 + sp.x1) / 2, span = Math.max(0.04, sp.x1 - sp.x0); E.flyTo(V3(cx, JOINT.y + 0.06 + span * 0.5, JOINT.z + 0.08 + span * 0.6), V3(cx, JOINT.y, JOINT.z), 0.9); }
+    const card = $('#defcard');
+    card.style.setProperty('--c', '#' + DCOL[i % DCOL.length].toString(16).padStart(6, '0'));
+    card.innerHTML = `<div class="dc-h"><i>${AR(i + 1)}</i><b>${d.name}</b><small class="mono">${d.en}</small><button type="button" class="icon-btn sm" data-act="def-close" aria-label="إغلاق">${ICON.close || '×'}</button></div>
+      <p><b>السبب:</b> ${d.cause}</p><p><b>العلاج:</b> ${d.fix}</p>
+      ${R.defects.length > 1 ? `<button type="button" class="btn sm" data-act="def-focus" data-i="${(i + 1) % R.defects.length}">العيب التالي</button>` : ''}`;
+    card.hidden = false;
+    voice.say(d.name + '. السبب: ' + d.cause + ' العلاج: ' + d.fix, 'high');
   }
 
   // ---------------------------------------------------------------- UI
   function renderTopbar() {
     const s = S(), st = state.stage, inSt = st !== 'hub' && s;
     $('#tb-back').hidden = !inSt;
-    $('#tb-title').innerHTML = inSt ? `<b>${s.name}</b><small class="mono">${s.code}</small>` : `<b>معمل اللحام الافتراضي</b><small>قسم اللحام — الثانوي الصناعي</small>`;
+    $('#tb-title').innerHTML = inSt ? `<b>${s.name}</b><small class="mono">${s.code}</small>` : `<b>مركز التدريب — ترسانة الإسكندرية</b><small>قسم اللحام والقطع بالغاز</small>`;
     const nav = $('#stepper'); nav.hidden = !inSt;
     if (inSt) {
       const cur = s.stages.findIndex(x => x[0] === st), dn = state.done[s.id] || {};
@@ -535,14 +612,14 @@ export function startApp(STATIONS) {
         ${R.setNote ? `<p class="muted small">${R.setNote}</p>` : ''}
       </section>
       <section class="card"><h3 class="sm">العيوب التي ظهرت</h3>
-        ${R.defects.length ? R.defects.map((d, i) => `<div class="defect"><i>${AR(i + 1)}</i><div><b>${d.name} <small class="mono muted">${d.en}</small></b><span><b>السبب:</b> ${d.cause}</span><span><b>العلاج:</b> ${d.fix}</span></div></div>`).join('') : '<p class="good-t">لا توجد عيوب واضحة. عمل نظيف!</p>'}
+        ${clean && clean.active ? '<p class="muted small">ستظهر العيوب على الخط بعد التنظيف.</p>' : ''}${R.defects.length ? R.defects.map((d, i) => `<div class="defect" data-act="def-focus" data-i="${i}" role="button" tabindex="0" style="--c:#${DCOL[i % DCOL.length].toString(16).padStart(6, '0')}"><i>${AR(i + 1)}</i><div><b>${d.name} <small class="mono muted">${d.en}</small></b><span><b>السبب:</b> ${d.cause}</span><span><b>العلاج:</b> ${d.fix}</span></div></div>`).join('') : '<p class="good-t">لا توجد عيوب واضحة. عمل نظيف!</p>'}
       </section>
       ${R.kind !== 'cut' ? `<section class="card"><h3 class="sm">قطاع عرضي تقريبي</h3>${sectionSVG(R)}</section>` : ''}
       ${s.inspectExtra ? s.inspectExtra(ctx) : ''}
       ${attempts.length > 1 ? `<section class="card"><h3 class="sm">آخر محاولاتك</h3><div class="attempts">${attempts.map(a => `<span><b class="mono">${a.total}</b><small>${a.when}</small></span>`).join('')}</div></section>` : ''}
       <div class="row2">
-        ${sim.proc && sim.proc.slag ? `<button type="button" class="btn" data-act="slag">${ICON.hammer}أزل الخبث</button>` : `<button type="button" class="btn" data-act="cam-inspect">${ICON.target}منظر قريب</button>`}
-        <button type="button" class="btn ${state.showDef ? 'on' : ''}" data-act="defects">${ICON.target}إظهار الأخطاء</button>
+        <button type="button" class="btn" data-act="cam-inspect">${ICON.target}منظر قريب</button>
+        <button type="button" class="btn ${state.showDef ? 'on' : ''}" data-act="defects">${ICON.target}${state.showDef ? 'إخفاء العيوب' : 'العيوب على الخط'}</button>
       </div>
       <div class="row2">
         <button type="button" class="btn" data-go="weld">${ICON.reset}حاول مرة أخرى</button>
@@ -641,6 +718,12 @@ export function startApp(STATIONS) {
     if (!sim.samples.length) { showToast('info', 'لم تبدأ بعد. المس بداية الخط وابدأ.'); return; }
     state.weld.pressing = false;
     state.report = sim.evaluate();
+    if (state.prep && !state.prep.done) { clean.stop(); state.prep.done = true; }
+    if (state.prep && state.prep.clean < 0.8 && sim.proc.kind !== 'cut') {
+      const R = state.report; R.total = Math.max(0, R.total - 8); R.grade = R.total >= 90 ? 'ممتاز' : R.total >= 75 ? 'جيد جداً' : R.total >= 60 ? 'جيد' : R.total >= 50 ? 'مقبول' : 'يحتاج إلى تدريب';
+      R.defects.unshift({ name: 'مسامية بسبب سطح غير نظيف', en: 'Porosity (dirty surface)', cause: 'لم تُنظَّف حواف الوصلة من الصدأ والزيوت قبل اللحام.', fix: 'نظّف مكان اللحام بالفرشاة السلكية حتى يظهر المعدن لامعًا قبل أن تبدأ.', spots: [{ x0: JOINT.x0 + 0.004, x1: JOINT.x0 + (JOINT.x1 - JOINT.x0) * Math.min(1, R.coverage) - 0.004, all: true }] });
+      R.crit.push({ label: 'تنظيف السطح', v: Math.round(state.prep.clean * 100) });
+    }
     markDone('weld');
     const s = S(), at = store.get('attempts.' + s.id, []), d = new Date();
     at.push({ total: state.report.total, when: d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) });
@@ -672,6 +755,9 @@ export function startApp(STATIONS) {
     else if (a === 'new-consumable') { sim.consumable = sim.proc.consumable.len; showToast('info', sim.proc.consumable.newMsg); }
     else if (a === 'finish') finishWeld();
     else if (a === 'slag') { if (sim.startSlagRemoval()) { showToast('info', 'جارٍ تكسير الخبث بالمطرقة…'); [0, 180, 360, 540, 720, 900].forEach(d => setTimeout(() => audio.sfx('chip'), d)); } }
+    else if (a === 'clean-skip') { clean.skip(); }
+    else if (a === 'def-focus') { focusDefect(+el.dataset.i, +(el.dataset.j || 0)); }
+    else if (a === 'def-close') { $('#defcard').hidden = true; }
     else if (a === 'defects') { state.showDef = !state.showDef; showDefects(state.showDef); renderPanel(); }
     else if (a === 'finish-station') goHub();
     else if (a === 'sound') { state.sound = audio.enabled = !state.sound; renderTopbar(); }
@@ -707,12 +793,12 @@ export function startApp(STATIONS) {
 
   // ---------------------------------------------------------------- loop & boot
   E.onFrame(dt => {
-    holdFrame(dt);
+    holdFrame(dt); clean && clean.frame(dt);
     const s = S();
     if (state.stage === 'weld') weldFrame(dt);
     else if (sim) { sim.time += dt; if (state.stage === 'inspect') sim.updateSlag(dt); sim.updateRipples(); sim.updateSparks(dt); sim.updateSmoke(dt); }
     s && s.frame && s.frame(ctx, dt);
-    updateHotspots();
+    updateHotspots(); updateDefMarks();
   });
 
   (async function boot() {
@@ -737,7 +823,7 @@ export function startApp(STATIONS) {
   })();
 
   if (/[?&]debug/.test(location.search)) window.__wl = {
-    state, ctx, goStage, enterStation, goHub, finishWeld, E, sim: () => sim, S, voice, spoken: (() => { const a = []; const o = voice.say.bind(voice); voice.say = (t, p) => { a.push(t); return o(t, p); }; return a; })(),
+    state, ctx, JOINT, goStage, enterStation, goHub, finishWeld, E, sim: () => sim, S, voice, spoken: (() => { const a = []; const o = voice.say.bind(voice); voice.say = (t, p) => { a.push(t); return o(t, p); }; return a; })(),
     simulate(secs = 50, opts = {}) {
       const dt = 1 / 60, proc = sim.proc; let x = JOINT.x0;
       const sp = opts.speed ?? (proc.ideal.speed[0] + proc.ideal.speed[1]) / 2, dd = opts.dist ?? (proc.ideal.dist[0] + proc.ideal.dist[1]) / 2;

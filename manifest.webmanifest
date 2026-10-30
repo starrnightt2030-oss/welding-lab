@@ -1,15 +1,15 @@
 {
-  "name": "معمل اللحام الافتراضي",
+  "name": "معمل اللحام الافتراضي — مركز تدريب ترسانة الإسكندرية",
   "short_name": "معمل اللحام",
-  "description": "معمل لحام افتراضي ثلاثي الأبعاد لطلاب قسم اللحام بالمدارس الثانوية الصناعية — Designed & developed by Mohamed-Eldawly",
+  "description": "معمل لحام افتراضي ثلاثي الأبعاد — شركة ترسانة الإسكندرية، مركز التدريب، قسم اللحام والقطع بالغاز — Designed & developed by Mohamed-Eldawly",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "/welding-lab/index.html?source=pwa",
   "scope": "/welding-lab/",
   "display": "fullscreen",
   "orientation": "landscape",
-  "background_color": "#0E1014",
-  "theme_color": "#0E1014",
+  "background_color": "#0A0F1C",
+  "theme_color": "#0A0F1C",
   "icons": [
     {
       "src": "icons/icon-192.png",

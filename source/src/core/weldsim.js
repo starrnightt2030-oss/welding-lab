@@ -64,6 +64,7 @@ export class WeldSim {
     const p = this.proc;
     this.ripples = []; this.samples = [];
     this.events = { stuck: 0, outs: 0, strikes: 0, lost: 0, early: 0 };
+    this.evPos = []; this.evSeen = {}; this.lastInX = JOINT.x0;
     this.on = false; this.stuck = false; this.lastX = null;
     this.progress = JOINT.x0; this.gap = 0; this.grace = 0;
     this.speed = 0; this.speedEMA = 0; this.time = 0;
@@ -99,6 +100,7 @@ export class WeldSim {
     const p = this.proc; this.time += dt;
     const out = { msg: null };
     const x = THREE.MathUtils.clamp(input.x, JOINT.x0 - 0.03, JOINT.x1 + 0.01);
+    this.trackEvents(x); this.lastInX = x;
     const d = input.dist;
     const sNow = { speed: this.speed, dist: d, angle: input.angle, aux: !!input.aux, settings: this.settings, heat: this.heatAt(x) };
     // cool down everything
@@ -315,6 +317,39 @@ export class WeldSim {
     });
   }
 
+  // ---- hand cleaning with the chipping hammer / wire brush
+  slagTotal() { return this.ripples.filter(r => r.slag).length; }
+  slagLeft() { const t = this.slagTotal(); return t ? this.ripples.filter(r => r.slag && !r.chipped).length / t : 0; }
+  chipAt(x, rad = 0.008) {
+    const hits = [], c = new THREE.Color();
+    this.ripples.forEach((r, i) => {
+      if (!r.slag || r.chipped || Math.abs(r.x - x) > rad * (0.7 + Math.random() * 0.6)) return;
+      r.chipped = true; hits.push(r);
+      this.inst(this.slag, i, r.x, JOINT.y, r.z, 0, 0, 0);
+      c.setRGB(0.66, 0.62, 0.55); this.bead.setColorAt(i, c);
+    });
+    if (hits.length) { this.slag.instanceMatrix.needsUpdate = true; this.bead.instanceColor.needsUpdate = true; }
+    if (this.slagLeft() < 0.02) { this.slagRemoved = true; this.slag.count = 0; }
+    return hits;
+  }
+  brushAt(x, rad = 0.012) {
+    let n = 0; const c = new THREE.Color();
+    this.ripples.forEach((r, i) => {
+      if (Math.abs(r.x - x) > rad || (r.slag && !r.chipped) || r.brushed) return;
+      r.brushed = true; n++;
+      if (!this.proc.bead?.tint) { c.setRGB(0.82, 0.82, 0.8); this.bead.setColorAt(i, c); }
+    });
+    if (n) this.bead.instanceColor.needsUpdate = true;
+    // knock off spatter balls near the brush
+    let sp = false;
+    for (let i = 0; i < this.spatter.count; i++) {
+      this.spatter.getMatrixAt(i, this.M4); this.P.setFromMatrixPosition(this.M4);
+      if (Math.abs(this.P.x - x) < rad && Math.abs(this.P.z - JOINT.z) < 0.03) { this.inst(this.spatter, i, this.P.x, this.P.y, this.P.z, 0, 0, 0); sp = true; }
+    }
+    if (sp) this.spatter.instanceMatrix.needsUpdate = true;
+    return n;
+  }
+  brushedFrac() { const b = this.ripples.filter(r => !r.slag || r.chipped); return b.length ? b.filter(r => r.brushed).length / this.ripples.length : 0; }
   startSlagRemoval() { if (!this.proc.slag || this.slagRemoved) return false; this.slagRemoved = true; this.slagAnim = { t: 0 }; return true; }
   updateSlag(dt) {
     if (!this.slagAnim) return false;
@@ -332,8 +367,39 @@ export class WeldSim {
     return true;
   }
 
+  // remember WHERE each event (stick, arc out, tungsten touch, backfire…) happened, for on-bead defect markers
+  trackEvents(x) {
+    for (const [k, v] of Object.entries(this.events)) {
+      const was = this.evSeen[k] || 0;
+      if (v > was && k !== 'strikes') for (let i = was; i < v; i++) this.evPos.push({ k, x: THREE.MathUtils.clamp(x, JOINT.x0, JOINT.x1) });
+      this.evSeen[k] = v;
+    }
+  }
+  // map each defect to the stretches of the joint where it happened
+  localize(d, bins, coverage) {
+    const K = {
+      'Undercut': ['fast'], 'Burn-through': ['slow'], 'Heavy dross': ['slow'], 'Overlap': ['slow'], 'Overlap / cold lap': ['slow'],
+      'Spatter': ['long'], 'Excess spatter': ['long'], 'Porosity': ['long'], 'Wandering arc': ['long'], 'Rounded top edge': ['long'],
+      'Lack of fusion': ['short', 'fast'], 'Lack of penetration': ['fast', 'short'], 'Incomplete penetration': ['fast', 'short'], 'Stubbing / ropey bead': ['short'],
+      'Underfill': ['nofill'], 'Electrode sticking': ['ev:stuck'], 'Lost cut': ['ev:lost'], 'Premature cutting oxygen': ['ev:early'],
+      'Carbon pickup': ['ev:*'], 'Tungsten contamination': ['ev:*'], 'Nozzle contact': ['ev:*'], 'Backfire': ['ev:*']
+    }[d.en];
+    const xs = [];
+    if (d.en === 'Incomplete') { const e = JOINT.x0 + (JOINT.x1 - JOINT.x0) * Math.min(1, coverage); return [{ x0: Math.min(e, JOINT.x1 - 0.012), x1: JOINT.x1 }]; }
+    (K || []).forEach(k => {
+      if (k.startsWith('ev:')) { const t = k.slice(3); this.evPos.filter(e => t === '*' ? !['strikes', 'outs'].includes(e.k) : e.k === t).forEach(e => xs.push([e.x - 0.004, e.x + 0.004])); }
+      else bins.forEach(b => { if (b.issues && b.issues.includes(k)) xs.push([JOINT.x0 + b.i * 0.01, JOINT.x0 + b.i * 0.01 + 0.01]); });
+    });
+    if (!xs.length) return [{ x0: JOINT.x0 + 0.004, x1: JOINT.x0 + (JOINT.x1 - JOINT.x0) * Math.min(1, coverage) - 0.004, all: true }];   // whole bead (setting-related)
+    xs.sort((a, b) => a[0] - b[0]);
+    const out = [];
+    xs.forEach(([a, b]) => { const l = out[out.length - 1]; if (l && a <= l.x1 + 0.006) l.x1 = Math.max(l.x1, b); else out.push({ x0: a, x1: b }); });
+    return out.sort((a, b) => (b.x1 - b.x0) - (a.x1 - a.x0)).slice(0, 3).sort((a, b) => a.x0 - b.x0);
+  }
+
   // ------------- scoring -------------
   evaluate() {
+    this.trackEvents(this.lastInX);
     const p = this.proc, S = this.samples.filter(s => p.kind !== 'cut' || s.aux);
     const id = p.ideal;
     const coverage = Math.max(0, (Math.min(this.progress, JOINT.x1) - JOINT.x0 - this.gap) / (JOINT.x1 - JOINT.x0));
@@ -385,6 +451,7 @@ export class WeldSim {
     const ctx = { bins, count, events: this.events, settings: this.settings, coverage, sim: this, AR };
     const defects = p.defects ? p.defects(ctx) : [];
     if (coverage < 0.95) defects.push({ name: p.kind === 'cut' ? 'قطع غير مكتمل' : 'خط غير مكتمل', en: 'Incomplete', cause: (p.kind === 'cut' ? 'القطع' : 'الخط') + ' لم تغطِّ الطول كله (' + AR(Math.round(coverage * 100)) + '٪).', fix: 'أكمل حتى نهاية الخط.' });
+    defects.forEach(d => { d.spots = this.localize(d, bins, coverage); });
     const W = avg(this.ripples.map(r => r.w)) * 1000, H = avg(this.ripples.map(r => r.h)) * 1000;
     const grade = total >= 90 ? 'ممتاز' : total >= 75 ? 'جيد جداً' : total >= 60 ? 'جيد' : total >= 50 ? 'مقبول' : 'يحتاج إلى تدريب';
     return { total, grade, crit, defects, bins, coverage, width: W, height: H, penetration: p.penetration ? p.penetration(this.settings) : 1, avgSpeed: avg(sv), avgDist: avg(dv), kind: p.kind, distName: p.distName, setNote: set.note };

@@ -1,5 +1,6 @@
 // All 3D models of the SMAW station, built procedurally with PBR materials (units: meters).
 import * as THREE from 'three';
+import { buildBrandSign } from './brand.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { Textures } from './textures.js';
 
@@ -57,6 +58,9 @@ export function buildRoom(scene) {
   back.position.set(0, 2, -1.6); scene.add(back);
   const side = mesh(new THREE.PlaneGeometry(12, 4), wallMat, false, true);
   side.rotation.y = Math.PI / 2; side.position.set(-2.2, 2, 0); scene.add(side);
+  // training-center sign on the back wall and the side wall
+  const sign = buildBrandSign(1.9); sign.position.set(0.3, 2.3, -1.585); scene.add(sign);
+  const sign2 = buildBrandSign(1.3); sign2.rotation.y = Math.PI / 2; sign2.position.set(-2.185, 1.75, -0.35); scene.add(sign2);
 
   // yellow safety line on floor around the booth
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xd9a400, roughness: 0.7 });

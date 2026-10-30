@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 import { readdirSync, writeFileSync } from 'fs';
 await build({ entryPoints: ['src/main.js'], bundle: true, minify: true, format: 'iife', target: ['chrome100', 'safari15'], outfile: 'app/app.js', legalComments: 'none' });
-const files = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', ...readdirSync('app/fonts').map(f => './fonts/' + f)];
+const files = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './brand/logo-160.png', './brand/logo-256.webp', ...readdirSync('app/fonts').map(f => './fonts/' + f)];
 const ver = 'weldlab-' + Date.now();
 // Network-first for pages/code (always fresh when online), cache fallback when offline.
 writeFileSync('app/sw.js', `const C='${ver}';const F=${JSON.stringify(files)};

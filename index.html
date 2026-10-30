@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0E1014">
+<meta name="theme-color" content="#0A0F1C">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,6 +17,9 @@
 <body data-stage="hub">
 <section id="viewport" aria-label="المعمل ثلاثي الأبعاد">
   <div id="hotspots"></div>
+  <div id="defmarks"></div>
+  <div id="defcard" class="glass" role="dialog" aria-live="polite" hidden></div>
+  <div id="clean-ui" class="glass" role="status" hidden></div>
   <div id="lens" aria-hidden="true"></div>
   <div id="hud"></div>
   <div id="coach" role="status"></div>
@@ -35,7 +38,7 @@
 <header id="topbar">
   <div class="tb-start glass">
     <button type="button" id="tb-back" class="icon-btn" data-act="home" aria-label="رجوع للمحطات" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
-    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20l7-7"/><path d="M11 13l3-8 5 5-8 3z"/><path d="M17 17l2 2M19 14l2 1M14 19l1 2"/></svg></div>
+    <img class="logo-img" src="brand/logo-160.png" alt="شعار مركز التدريب — شركة ترسانة الإسكندرية" width="80" height="80">
     <div id="tb-title" class="tb-title"></div>
   </div>
   <nav id="stepper" class="glass" aria-label="مراحل المحطة" hidden></nav>
@@ -65,7 +68,8 @@
           <linearGradient id="gApron" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c5c2a"/><stop offset="1" stop-color="#6b3b18"/></linearGradient>
           <linearGradient id="gHelm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a4049"/><stop offset=".6" stop-color="#1d2128"/><stop offset="1" stop-color="#121418"/></linearGradient>
           <linearGradient id="gLens" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fbf7a"/><stop offset="1" stop-color="#0b3a22"/></linearGradient>
-          <linearGradient id="gPants" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#34497a"/><stop offset="1" stop-color="#1c2a4c"/></linearGradient>
+          <linearGradient id="gPants" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a7de0"/><stop offset="1" stop-color="#1b4597"/></linearGradient>
+          <linearGradient id="gCover" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4189ea"/><stop offset=".55" stop-color="#2a63c4"/><stop offset="1" stop-color="#173c86"/></linearGradient>
           <linearGradient id="gGlove" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0bd72"/><stop offset="1" stop-color="#b57b35"/></linearGradient>
           <linearGradient id="gMach" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffa04a"/><stop offset="1" stop-color="#d4601a"/></linearGradient>
           <linearGradient id="gCylO" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2f5fa8"/><stop offset=".45" stop-color="#5b8ad6"/><stop offset="1" stop-color="#1d3d72"/></linearGradient>
@@ -110,24 +114,28 @@
           <!-- legs & boots -->
           <path d="M176 300 h30 l-2 112 h-26 z" fill="url(#gPants)"/>
           <path d="M214 300 h30 l2 112 h-27 z" fill="url(#gPants)"/>
+          <path d="M177 372 h29 v7 h-29 z M214 372 h31 v7 h-31 z" fill="#c9d3e0" stroke-width="1.5"/><path d="M177 379 h29 v5 h-29 z M214 379 h31 v5 h-31 z" fill="#e4232a" stroke-width="1.5"/>
           <path d="M170 410 h38 v22 h-48 a10 10 0 0 1 10 -22 z" fill="#3b2617"/>
           <path d="M216 410 h36 a12 12 0 0 1 12 22 h-48 z" fill="#3b2617"/>
           <path d="M160 432 h48 M216 432 h48" stroke-width="5"/>
           <!-- right arm (hammer) -->
-          <path d="M250 186 q24 30 22 76 l-22 4 q2 -40 -14 -64 z" fill="url(#gLeather)"/>
+          <path d="M250 186 q24 30 22 76 l-22 4 q2 -40 -14 -64 z" fill="url(#gCover)"/>
+          <path d="M262 236 l11 -2 l1 9 l-12 2 z" fill="#c9d3e0" stroke-width="1.5"/><path d="M263 244 l11 -2 l0 5 l-11 2 z" fill="#e4232a" stroke-width="1.5"/>
           <g class="hammer"><path d="M262 300 l18 64" stroke-width="6" stroke="#6b4423"/><path d="M266 362 l30 -8 l-2 -9 l-26 4 l-16 2 z" fill="url(#gSteel)"/></g>
           <path d="M248 262 h26 l2 30 q-14 14 -28 0 z" fill="url(#gGlove)"/>
           <!-- torso -->
-          <path d="M152 186 q50 -22 104 0 l-6 120 h-92 z" fill="url(#gLeather)"/>
-          <path d="M180 178 l24 30 l24 -30" fill="#e9dcc6"/>
-          <path d="M170 214 q34 -10 68 0 l2 128 q-36 10 -72 0 z" fill="url(#gApron)"/>
-          <path d="M176 222 q28 -8 56 0 M176 334 l-2 -104 M234 334 l2 -104" fill="none" stroke="#d99a5e" stroke-width="1.6" stroke-dasharray="4 4"/>
-          <path d="M160 300 h88" stroke="#3b2617" stroke-width="7"/>
-          <rect x="196" y="294" width="16" height="12" rx="2" fill="#c9a24a" stroke-width="2"/>
+          <path d="M152 186 q50 -22 104 0 l-6 120 h-92 z" fill="url(#gCover)"/>
+          <path d="M180 178 l24 30 l24 -30" fill="#173c86"/>
+          <path d="M204 208 v96" stroke="#0f2a63" stroke-width="2.5" fill="none"/><path d="M204 208 v96" stroke="#c9d3e0" stroke-width="1" stroke-dasharray="2 3" fill="none"/>
+          <path d="M166 226 h28 v24 h-28 z" fill="#2257b4" stroke-width="2"/><path d="M166 232 h28" stroke-width="1.5"/>
+          <circle cx="228" cy="236" r="15" fill="#fff" stroke="#0b1f4a" stroke-width="2"/>
+          <image href="brand/logo-160.png" x="214" y="222" width="28" height="28"/>
+          <path d="M156 284 h96 v8 h-96 z" fill="#c9d3e0" stroke-width="1.5"/><path d="M156 292 h96 v6 h-96 z" fill="#e4232a" stroke-width="1.5"/>
           <!-- left arm holding the electrode holder -->
           <g class="arm">
-            <path d="M156 190 q-30 24 -40 64 l20 10 q10 -34 34 -54 z" fill="url(#gLeather)"/>
-            <path d="M118 252 q-10 22 -14 40 l22 8 q6 -18 12 -38 z" fill="url(#gLeather)"/>
+            <path d="M156 190 q-30 24 -40 64 l20 10 q10 -34 34 -54 z" fill="url(#gCover)"/>
+            <path d="M118 252 q-10 22 -14 40 l22 8 q6 -18 12 -38 z" fill="url(#gCover)"/>
+            <path d="M126 232 l18 8 l-3 7 l-18 -8 z" fill="#e4232a" stroke-width="1.5"/>
             <path d="M100 286 l26 8 l4 22 q-22 10 -36 -6 z" fill="url(#gGlove)"/>
             <path d="M102 310 l-20 30" stroke="#16191d" stroke-width="10"/>
             <path d="M96 314 l-10 14" stroke="#c0392b" stroke-width="4"/>
@@ -149,9 +157,12 @@
       </svg>
     </div>
     <div class="intro-text">
-      <div class="intro-kicker">قسم اللحام — التعليم الثانوي الصناعي</div>
+      <div class="brand-blk">
+        <span class="brand-logo"><img src="brand/logo-256.webp" alt="شعار مركز التدريب — شركة ترسانة الإسكندرية" width="256" height="256"></span>
+        <div class="brand-tx"><b>شركة ترسانة الإسكندرية</b><span>مركز التدريب — قسم اللحام والقطع بالغاز</span><small dir="ltr">Alexandria Shipyard · Training Center · Welding &amp; Gas Cutting Dept.</small></div>
+      </div>
       <h1 class="intro-title"><span class="l1">مرحباً بكم في</span><span class="l2"><span class="fill">معمل محاكاة عمليات اللحام الافتراضي</span><i class="torch-dot"></i></span></h1>
-      <p class="intro-sub">قوس كهربي • غاز وقطع • كربون • ثاني أكسيد الكربون • TIG • MIG</p>
+      <p class="intro-sub">القوس الكهربائي • الغاز والقطع • الكربون • ثاني أكسيد الكربون • TIG • MIG</p>
       <div class="intro-go">
         <div class="intro-load"><div class="spin"></div><small>بنجهّز المعمل…</small></div>
         <button type="button" id="intro-start" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>ادخل المعمل</button>

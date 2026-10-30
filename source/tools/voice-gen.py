@@ -21,7 +21,9 @@ async def probe():
         log('probe FAILED', type(e).__name__, repr(e)[:500]); LOG.close(); sys.exit(1)
 asyncio.run(probe())
 def save_index():
-    json.dump({'voice': VOICE + RATE + PITCH, 'ids': sorted(done)}, open(idx_path, 'w'))
+    d = {'voice': VOICE + RATE + PITCH, 'ids': sorted(done)}
+    json.dump(d, open(idx_path, 'w'))
+    open(os.path.join(D, 'index.js'), 'w').write('window.VOICE_INDEX=' + json.dumps(d) + ';')
 async def one(i, t):
     p = os.path.join(D, i + '.mp3')
     if os.path.exists(p) and os.path.getsize(p) > 500: done.append(i); return
