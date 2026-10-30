@@ -9,6 +9,7 @@ import { ICON } from './icons.js';
 import { Voice } from './voice.js';
 import { runIntro, WELCOME } from '../intro.js';
 import { createCleaning } from './cleaning.js';
+import { createAmbience } from '../ambience.js';
 import { HUB, INTRO } from '../voicescript.js';
 import { buildChippingHammer, buildWireBrush } from '../ppe.js';
 
@@ -33,7 +34,7 @@ export function startApp(STATIONS) {
     weld: { pressing: false, x: JOINT.x0, dist: 20, aux: false },
     report: null, showDef: false, drawer: true, op: {}, voice: voice.enabled
   };
-  let clean = null, M, sim, plates, hammer, brush, platesOpts = '', booted = false;
+  let clean = null, ambience = null, M, sim, plates, hammer, brush, platesOpts = '', booted = false;
   const shared = {};
 
   const ctx = {
@@ -49,7 +50,7 @@ export function startApp(STATIONS) {
   async function build() {
     try { await Promise.all(['600 34px "IBM Plex Mono"', '600 26px "IBM Plex Sans Arabic"'].map(f => document.fonts.load(f))); } catch (e) { /* optional */ }
     M = makeMaterials();
-    buildRoom(E.scene);
+    ambience = createAmbience(E.scene, buildRoom(E.scene), E);
     E.scene.add(buildTable(M));
     hammer = buildChippingHammer(); hammer.position.set(0.7, TABLE_Y, -0.17); hammer.rotation.y = 0.5; E.scene.add(hammer);
     brush = buildWireBrush(); brush.position.set(0.02, TABLE_Y, -0.2); brush.rotation.y = -0.3; E.scene.add(brush);
@@ -82,7 +83,7 @@ export function startApp(STATIONS) {
   // ---------------------------------------------------------------- stage flow
   function enterStation(id) {
     STATIONS.forEach(s => { if (s.root) s.root.visible = s.id === id; });
-    state.station = id;
+    state.station = id; ambience && ambience(id);
     state.explore = { sel: 0, labels: false, exploded: false };
     state.op = {};
     const s = S();
@@ -95,6 +96,7 @@ export function startApp(STATIONS) {
     state.stage = 'hub';
     document.body.dataset.stage = 'hub';
     STATIONS.forEach(s => { if (s.root) s.root.visible = s.id === (state.station || 'smaw'); });
+    ambience && ambience(state.station || 'smaw');
     E.controls.enabled = true; E.controls.autoRotate = true; E.controls.autoRotateSpeed = 0.45;
     E.setHighlight([]);
     renderAll();

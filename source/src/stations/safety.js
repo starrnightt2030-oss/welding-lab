@@ -5,6 +5,7 @@ import { TABLE_Y, Cable } from '../models.js';
 import { buildCylinder, mesh } from '../gasparts.js';
 import { Textures } from '../textures.js';
 import { ICON } from '../core/icons.js';
+import { buildTrainee } from '../trainee.js';
 import { buildHelmet, buildGlove, buildGoggles, buildGlasses, buildFaceShield, buildJacket, buildApron, buildBoots, buildEarPlugs, buildRespirator, buildExtinguisher, buildFirstAid } from '../ppe.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -60,6 +61,7 @@ const HAZ = [
   { id: 'hz-grinder', name: 'جلّاخة بدون واقٍ', why: 'إذا انكسر القرص فقد يصيب الوجه أو الجسم؛ يُمنع نزع الواقي.' }
 ];
 const haz = { found: {}, last: null };
+let trainee = null;
 
 S.build = ctx => {
   ctxRef = ctx;
@@ -99,6 +101,7 @@ S.build = ctx => {
   hang('glovesT', buildGlove(0xe2d6c2, true), BX - 0.16, BY - 0.3, [Math.PI / 2, 0, 0], 'قفاز TIG', BY - 0.44);
   hang('resp', buildRespirator(), BX + 0.2, BY - 0.28, [Math.PI / 2, 0, 0], 'كمامة الأبخرة', BY - 0.44);
   // empty table in front
+  trainee = buildTrainee(); trainee.position.set(1.08, 0, 0.2); trainee.rotation.y = -0.45; trainee.visible = false; R.add(trainee);
   // stand with jacket & apron
   const stand = new THREE.Group();
   const pole = mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.75, 12), M.tube); pole.position.y = 0.875; stand.add(pole);
@@ -149,7 +152,7 @@ S.holdable = id => ['helmet', 'shield', 'goggles', 'glasses', 'glovesL', 'gloves
 S.partAnchor = id => { const o = items[id]; const v = o.isObject3D ? o.getWorldPosition(new THREE.Vector3()) : o.position.clone(); if (id === 'jacket') v.y += 0.05; return v; };
 S.cams = {
   explore: () => ({ pos: V3(0.3, 1.5, 1.95), target: V3(0.15, 1.18, -0.5) }),
-  wear: () => ({ pos: V3(0.3, 1.5, 1.95), target: V3(0.15, 1.18, -0.5) }),
+  wear: () => ({ pos: V3(0.85, 1.35, 2.95), target: V3(0.6, 0.98, -0.1) }),
   hazards: () => ({ pos: V3(0.9, 1.8, 2.1), target: V3(-0.25, 0.3, 0.1) })
 };
 
@@ -169,7 +172,7 @@ function checkWear() {
 }
 S.custom = {
   wear: {
-    enter: ctx => { wear.result = null; hazGroup.visible = false; ctx.E.setHighlight(Object.keys(wear.sel).filter(k => wear.sel[k]).map(k => items[k])); },
+    enter: ctx => { wear.result = null; hazGroup.visible = false; trainee && trainee.userData.set(wear.sel); ctx.E.setHighlight(Object.keys(wear.sel).filter(k => wear.sel[k]).map(k => items[k])); },
     html: () => {
       const t = TASKS[wear.task], r = wear.result;
       const needIds = t.need.flatMap(([g]) => Array.isArray(g) ? g : [g]);
@@ -231,7 +234,14 @@ S.operateAction = (op, el, ctx) => {
   else if (op === 'check') { const r = checkWear(); ctx.say && ctx.say(r.ok ? 'ممتاز، ما ترتديه مناسب لهذا العمل.' : [...r.missing.map(m => 'ينقصك ' + m.why), ...r.wrong.map(k => nameOf(k) + '. ' + TASKS[wear.task].bad[k])].join('. '), r.ok ? 'good' : 'bad'); }
   else if (op === 'hint') { const left = HAZ.filter(h => !haz.found[h.id]); if (left.length) { const o = hazards.find(x => x.userData.pick === left[0].id); const p = o.getWorldPosition(new THREE.Vector3()); ctx.E.flyTo(p.clone().add(V3(0.35, 0.55, 0.75)), p); haz.last = { t: 'info', s: 'انظر حول هذا المكان جيدًا.' }; } }
   if (ctx.state.stage === 'wear') ctx.E.setHighlight(Object.keys(wear.sel).filter(k => wear.sel[k]).map(k => items[k]));
+  if (trainee) trainee.userData.set(wear.sel);
+  // wrong items are taken off the trainee after the explanation
+  if (op === 'check' && wear.result && wear.result.wrong.length) {
+    const wr = wear.result.wrong.slice();
+    setTimeout(() => { wr.forEach(k => { wear.sel[k] = false; }); trainee && trainee.userData.set(wear.sel); ctx.toast('info', 'تمت إزالة ما لا يناسب هذا العمل: ' + wr.map(nameOf).join('، ') + '.'); if (ctx.state.stage === 'wear') ctx.E.setHighlight(Object.keys(wear.sel).filter(k => wear.sel[k]).map(k => items[k])); ctx.renderPanel(); }, 2600);
+  }
   ctx.renderPanel();
 };
+S.frame = (ctx, dt) => { if (!trainee) return; trainee.visible = ctx.state.stage === 'wear'; if (trainee.visible) trainee.userData.frame(dt); };
 
 export default S;

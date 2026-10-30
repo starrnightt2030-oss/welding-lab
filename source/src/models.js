@@ -94,6 +94,7 @@ export function buildRoom(scene) {
   hood.position.set(0.53, 1.44, -0.38); hood.rotation.x = 0.5;
   arm.add(hood);
   scene.add(arm);
+  return { floor, wallMat, back, side, curtain, curtainFrame: g, lineMat, fume: arm };
 }
 
 // ---------------- Table ----------------
