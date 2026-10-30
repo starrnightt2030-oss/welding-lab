@@ -10,6 +10,16 @@ if old.get('voice') != VOICE + RATE + PITCH:   # voice changed → regenerate ev
     for f in os.listdir(D):
         if f.endswith('.mp3'): os.remove(os.path.join(D, f))
 sem = asyncio.Semaphore(5); done = []; fail = []
+LOG = open(os.path.join(D, 'gen-log.txt'), 'w', encoding='utf-8')
+def log(*a): print(*a, flush=True); print(*a, file=LOG, flush=True)
+log('edge-tts', getattr(edge_tts, '__version__', '?'), VOICE, RATE, PITCH, 'lines', len(lines))
+async def probe():
+    try:
+        await asyncio.wait_for(edge_tts.Communicate('أهلاً بيكم في معمل اللحام.', VOICE).save(os.path.join(D, 'probe.mp3.part')), 40)
+        log('probe ok', os.path.getsize(os.path.join(D, 'probe.mp3.part')))
+    except Exception as e:
+        log('probe FAILED', type(e).__name__, repr(e)[:500]); LOG.close(); sys.exit(1)
+asyncio.run(probe())
 def save_index():
     json.dump({'voice': VOICE + RATE + PITCH, 'ids': sorted(done)}, open(idx_path, 'w'))
 async def one(i, t):
@@ -24,7 +34,7 @@ async def one(i, t):
                     done.append(i)
                     if len(done) % 50 == 0: save_index(); print('progress', len(done), '/', len(lines), flush=True)
                     return
-            except Exception as e: print('retry', i, type(e).__name__, flush=True)
+            except Exception as e: log('retry', i, type(e).__name__, repr(e)[:200])
             await asyncio.sleep(1 + k * 2)
         fail.append((i, t))
 async def main(): await asyncio.gather(*[one(i, t) for i, t in lines.items()])
@@ -32,4 +42,5 @@ asyncio.run(main())
 for f in os.listdir(D):   # drop clips no longer used
     if (f.endswith('.mp3') and f[:-4] not in lines) or f.endswith('.part'): os.remove(os.path.join(D, f))
 save_index()
-print('ok', len(done), 'failed', len(fail)); [print(' ', x) for x in fail[:20]]
+log('ok', len(done), 'failed', len(fail)); [log(' ', x) for x in fail[:20]]
+LOG.close()
