@@ -138,10 +138,10 @@ export function startApp(STATIONS) {
     E.flyTo(cam.pos, cam.target, prev === st ? 0.01 : 1.2);
     const intro = INTRO[s.id] && INTRO[s.id][st];
     if (st === 'assemble') voice.say((intro ? intro + ' ' : '') + stepSpeech());
-    else if (st === 'inspect' && state.report && !state.report.empty) voice.say('درجتك ' + state.report.total + ' من مية. التقدير ' + state.report.grade + '. ' + (state.report.defects.length ? 'العيوب اللي ظهرت: ' + state.report.defects.map(d => d.name).join('، ') + '.' : 'مافيش عيوب واضحة، شغل نضيف.'));
+    else if (st === 'inspect' && state.report && !state.report.empty) voice.say('درجتك ' + state.report.total + ' من مئة. التقدير ' + state.report.grade + '. ' + (state.report.defects.length ? 'العيوب التي ظهرت: ' + state.report.defects.map(d => d.name).join('، ') + '.' : 'لا توجد عيوب واضحة، عمل نظيف.'));
     else if (intro) voice.say(intro);
   }
-  function stepSpeech() { const s = S(), x = s.asmSteps && s.asmSteps[state.asm.step]; return x ? 'الخطوة ' + (state.asm.step + 1) + ': ' + x.title + '. ' + x.hint : 'خلّصت التركيب. دوس التالي.'; }
+  function stepSpeech() { const s = S(), x = s.asmSteps && s.asmSteps[state.asm.step]; return x ? 'الخطوة ' + (state.asm.step + 1) + ': ' + x.title + '. ' + x.hint : 'انتهى التركيب. اضغط التالي.'; }
   // keep the 3D subject centred in the free area beside the open drawer
   function applyViewOffset() {
     const w = viewport.clientWidth, h = viewport.clientHeight, dr = $('#drawer');
@@ -409,7 +409,7 @@ export function startApp(STATIONS) {
     $('#lens').dataset.shade = sim.proc.lensShade || 'arc';
     E.renderer.toneMappingExposure = THREE.MathUtils.lerp(E.renderer.toneMappingExposure, lensOn ? (sim.proc.lensExposure ?? 0.28) : 1.12, 1 - Math.pow(0.001, dt));
     updateHUD(out);
-    if (out.progress >= 0.999 && !sim.on && !w.done) { w.done = true; showToast('good', 'خلّصت! دوس «افحص» عشان تشوف النتيجة.'); }
+    if (out.progress >= 0.999 && !sim.on && !w.done) { w.done = true; showToast('good', 'أحسنت! اضغط «افحص» لترى النتيجة.'); }
   }
   ctx.tipPos = () => tipPos;
   ctx.resetTip = (x, y) => tipPos.set(x, y, JOINT.z);
@@ -489,7 +489,7 @@ export function startApp(STATIONS) {
         ${p.safety ? `<div class="safety">${ICON.shield}<div><b>سلامة</b><span>${p.safety}</span></div></div>` : ''}
         <div class="row2" style="margin-top:.8rem">
           <button type="button" class="btn" data-act="speak-part">${ICON.sound}اسمع الشرح</button>
-          ${canHold(p.id) ? `<button type="button" class="btn" data-act="hold-part">${ICON.hand}امسكه وقلّبه</button>` : `<button type="button" class="btn" data-act="cam-part">${ICON.eye}قرّب عليه</button>`}
+          ${canHold(p.id) ? `<button type="button" class="btn" data-act="hold-part">${ICON.hand}أمسكه وقلّبه</button>` : `<button type="button" class="btn" data-act="cam-part">${ICON.eye}قرّب الكاميرا</button>`}
         </div>
       </article>
       <div class="row2">
@@ -512,9 +512,9 @@ export function startApp(STATIONS) {
       ${m ? `<div class="msg ${m.t}" role="status">${m.t === 'bad' ? ICON.x : m.t === 'good' ? ICON.check : ICON.info}<span>${m.s}</span></div>` : ''}
       <div class="row2">
         <button type="button" class="btn" data-act="asm-reset">${ICON.reset}من الأول</button>
-        <button type="button" class="btn" data-act="asm-auto" ${done ? 'disabled' : ''}>${ICON.play}وريني الخطوة</button>
+        <button type="button" class="btn" data-act="asm-auto" ${done ? 'disabled' : ''}>${ICON.play}أرني الخطوة</button>
       </div>
-      ${done ? nextBtn('assemble') : `<button type="button" class="btn primary big" disabled>كمّل خطوات التركيب</button>`}`;
+      ${done ? nextBtn('assemble') : `<button type="button" class="btn primary big" disabled>أكمل خطوات التركيب</button>`}`;
   }
   function operateHTML() {
     const s = S(), r = s.operateReady(ctx);
@@ -522,7 +522,7 @@ export function startApp(STATIONS) {
   }
   function inspectHTML() {
     const s = S(), R = state.report;
-    if (!R || R.empty) return `<div class="card"><h3>مافيش شغل لسه</h3><p class="muted">ارجع لمرحلة «${s.stages.find(x => x[0] === 'weld')[1]}» ونفّذ على الوصلة.</p></div><button type="button" class="btn primary big" data-go="weld">ارجع ${ICON.next}</button>`;
+    if (!R || R.empty) return `<div class="card"><h3>لا يوجد عمل بعد</h3><p class="muted">ارجع إلى مرحلة «${s.stages.find(x => x[0] === 'weld')[1]}» ونفّذ على الوصلة.</p></div><button type="button" class="btn primary big" data-go="weld">ارجع ${ICON.next}</button>`;
     const C = 2 * Math.PI * 62;
     const attempts = store.get('attempts.' + s.id, []).slice(-6).reverse();
     return `
@@ -534,18 +534,18 @@ export function startApp(STATIONS) {
         ${R.crit.map(c => `<div class="crit"><span>${c.label}</span><div class="bar" dir="ltr"><i style="width:${c.v}%" class="${c.v >= 75 ? 'g' : c.v >= 50 ? 'w' : 'b'}"></i></div><b class="mono">${c.v}</b></div>`).join('')}
         ${R.setNote ? `<p class="muted small">${R.setNote}</p>` : ''}
       </section>
-      <section class="card"><h3 class="sm">العيوب اللي ظهرت</h3>
-        ${R.defects.length ? R.defects.map((d, i) => `<div class="defect"><i>${AR(i + 1)}</i><div><b>${d.name} <small class="mono muted">${d.en}</small></b><span><b>السبب:</b> ${d.cause}</span><span><b>العلاج:</b> ${d.fix}</span></div></div>`).join('') : '<p class="good-t">مافيش عيوب واضحة. شغل نضيف!</p>'}
+      <section class="card"><h3 class="sm">العيوب التي ظهرت</h3>
+        ${R.defects.length ? R.defects.map((d, i) => `<div class="defect"><i>${AR(i + 1)}</i><div><b>${d.name} <small class="mono muted">${d.en}</small></b><span><b>السبب:</b> ${d.cause}</span><span><b>العلاج:</b> ${d.fix}</span></div></div>`).join('') : '<p class="good-t">لا توجد عيوب واضحة. عمل نظيف!</p>'}
       </section>
       ${R.kind !== 'cut' ? `<section class="card"><h3 class="sm">قطاع عرضي تقريبي</h3>${sectionSVG(R)}</section>` : ''}
       ${s.inspectExtra ? s.inspectExtra(ctx) : ''}
       ${attempts.length > 1 ? `<section class="card"><h3 class="sm">آخر محاولاتك</h3><div class="attempts">${attempts.map(a => `<span><b class="mono">${a.total}</b><small>${a.when}</small></span>`).join('')}</div></section>` : ''}
       <div class="row2">
-        ${sim.proc && sim.proc.slag ? `<button type="button" class="btn" data-act="slag">${ICON.hammer}شيل الخبث</button>` : `<button type="button" class="btn" data-act="cam-inspect">${ICON.target}منظر قريب</button>`}
+        ${sim.proc && sim.proc.slag ? `<button type="button" class="btn" data-act="slag">${ICON.hammer}أزل الخبث</button>` : `<button type="button" class="btn" data-act="cam-inspect">${ICON.target}منظر قريب</button>`}
         <button type="button" class="btn ${state.showDef ? 'on' : ''}" data-act="defects">${ICON.target}إظهار الأخطاء</button>
       </div>
       <div class="row2">
-        <button type="button" class="btn" data-go="weld">${ICON.reset}حاول تاني</button>
+        <button type="button" class="btn" data-go="weld">${ICON.reset}حاول مرة أخرى</button>
         <button type="button" class="btn primary" data-act="finish-station" data-mark="inspect">إنهاء المحطة</button>
       </div>`;
   }
@@ -594,7 +594,7 @@ export function startApp(STATIONS) {
       <div class="weld-bottom">
         <div class="prog"><span>${proc.kind === 'cut' ? 'تقدّم القطع' : 'تقدّم الخط'}</span><div class="bar"><i id="prog-i"></i></div><b class="mono" id="prog-v">0%</b></div>
         ${proc.consumable ? `<div class="elec"><span>${proc.consumable.name}</span><div class="bar"><i id="elec-i"></i></div><b class="mono" id="elec-v"></b></div>` : proc.heatNeed ? `<div class="elec"><span>التسخين</span><div class="bar heat"><i id="heat-i"></i></div><b class="mono" id="heat-v"></b></div>` : ''}
-        <div class="hint">${state.control === 'rel' ? 'المس في أي مكان واسحب: يمين وشمال = الحركة على الخط، فوق وتحت = ' + proc.distName + '. صباعك مش هيغطّي الشغل.' : proc.hint}</div>
+        <div class="hint">${state.control === 'rel' ? 'المس أي مكان واسحب: يمينًا ويسارًا = الحركة على الخط، وأعلى وأسفل = ' + proc.distName + '. إصبعك لن يغطي العمل.' : proc.hint}</div>
       </div>`;
     const a = $('#angle');
     if (a) a.addEventListener('input', () => { state.angle = +a.value; $('#angle-v').textContent = state.angle + '°'; });
@@ -638,7 +638,7 @@ export function startApp(STATIONS) {
   }
 
   function finishWeld() {
-    if (!sim.samples.length) { showToast('info', 'لسه ماعملتش حاجة. المس بداية الخط وابدأ.'); return; }
+    if (!sim.samples.length) { showToast('info', 'لم تبدأ بعد. المس بداية الخط وابدأ.'); return; }
     state.weld.pressing = false;
     state.report = sim.evaluate();
     markDone('weld');
@@ -666,16 +666,16 @@ export function startApp(STATIONS) {
     else if (a === 'cam-inspect') { const c = inspectCamera(); E.flyTo(c.pos.clone().add(V3(0, -0.1, -0.06)), c.target); }
     else if (a === 'asm-reset') goStage('assemble');
     else if (a === 'asm-auto') { if (!state.asm.busy) s.asmAuto(ctx); }
-    else if (a === 'lens') { state.lens = !state.lens; renderHUD(); if (!state.lens) showToast('bad', 'تحذير: في الورشة ممنوع تبص للقوس أو اللهب من غير الماسك أو النظارة المناسبة. ده للعرض بس.'); }
-    else if (a === 'control') { state.control = state.control === 'rel' ? 'direct' : 'rel'; setAssist(state.assist); renderHUD(); showToast('info', state.control === 'rel' ? 'التحكم الدقيق: اسحب صباعك في أي مكان والحركة بتتنقل للأداة بهدوء.' : 'التحكم المباشر: المس الخط نفسه.'); }
+    else if (a === 'lens') { state.lens = !state.lens; renderHUD(); if (!state.lens) showToast('bad', 'تحذير: في الورشة يُمنع النظر إلى القوس أو اللهب دون قناع أو نظارة مناسبة. هذا للعرض فقط.'); }
+    else if (a === 'control') { state.control = state.control === 'rel' ? 'direct' : 'rel'; setAssist(state.assist); renderHUD(); showToast('info', state.control === 'rel' ? 'التحكم الدقيق: اسحب إصبعك في أي مكان، فتنتقل الحركة إلى الأداة بهدوء.' : 'التحكم المباشر: المس الخط نفسه.'); }
     else if (a === 'assist') { state.assist = !state.assist; setAssist(state.assist); renderHUD(); }
     else if (a === 'new-consumable') { sim.consumable = sim.proc.consumable.len; showToast('info', sim.proc.consumable.newMsg); }
     else if (a === 'finish') finishWeld();
-    else if (a === 'slag') { if (sim.startSlagRemoval()) { showToast('info', 'بتخبّط الخبث بالشاكوش…'); [0, 180, 360, 540, 720, 900].forEach(d => setTimeout(() => audio.sfx('chip'), d)); } }
+    else if (a === 'slag') { if (sim.startSlagRemoval()) { showToast('info', 'جارٍ تكسير الخبث بالمطرقة…'); [0, 180, 360, 540, 720, 900].forEach(d => setTimeout(() => audio.sfx('chip'), d)); } }
     else if (a === 'defects') { state.showDef = !state.showDef; showDefects(state.showDef); renderPanel(); }
     else if (a === 'finish-station') goHub();
     else if (a === 'sound') { state.sound = audio.enabled = !state.sound; renderTopbar(); }
-    else if (a === 'voice') { state.voice = voice.enabled = !state.voice; store.set('voice', state.voice); if (!state.voice) voice.stop(); else voice.say('الشرح الصوتي اشتغل.'); renderTopbar(); }
+    else if (a === 'voice') { state.voice = voice.enabled = !state.voice; store.set('voice', state.voice); if (!state.voice) voice.stop(); else voice.say('تم تشغيل الشرح الصوتي.'); renderTopbar(); }
     else if (a === 'speak-part') { const p = s.parts[state.explore.sel]; voice.lastT = 0; voice.say(partSpeech(p)); }
     else if (a === 'hold-part') { holdPart(s.partObject(s.parts[state.explore.sel].id)); }
     else if (a === 'cam-part') selectPart(state.explore.sel, true, false);
@@ -731,7 +731,7 @@ export function startApp(STATIONS) {
       setTimeout(() => voice.say(HUB), 700);
     } catch (e) {
       console.error(e);
-      $('#loading').innerHTML = `<p>حصلت مشكلة في تشغيل المعمل على الجهاز ده.</p><small class="mono">${String(e && e.message || e)}</small><button type="button" id="hard-reload" style="margin-top:1rem;padding:.8rem 1.2rem;border-radius:.8rem;border:none;background:#FF8A2B;color:#0E1014;font:700 1rem inherit">تنظيف وإعادة التحميل</button>`;
+      $('#loading').innerHTML = `<p>حدثت مشكلة في تشغيل المعمل على هذا الجهاز.</p><small class="mono">${String(e && e.message || e)}</small><button type="button" id="hard-reload" style="margin-top:1rem;padding:.8rem 1.2rem;border-radius:.8rem;border:none;background:#FF8A2B;color:#0E1014;font:700 1rem inherit">تنظيف وإعادة التحميل</button>`;
       const hr = $('#hard-reload'); if (hr) hr.onclick = hardReload;
     }
   })();
@@ -757,7 +757,7 @@ export function startApp(STATIONS) {
   // in-app install button (Chrome / Edge / Android)
   let deferredInstall = null;
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; const b = $('#install-btn'); if (b) b.hidden = false; });
-  window.addEventListener('appinstalled', () => { const b = $('#install-btn'); if (b) b.hidden = true; showToast('good', 'اتثبّت المعمل كتطبيق على الجهاز.', true); });
+  window.addEventListener('appinstalled', () => { const b = $('#install-btn'); if (b) b.hidden = true; showToast('good', 'تم تثبيت المعمل كتطبيق على الجهاز.', true); });
   document.addEventListener('click', e => { if (e.target.closest('#install-btn') && deferredInstall) { deferredInstall.prompt(); deferredInstall.userChoice.finally(() => { deferredInstall = null; $('#install-btn').hidden = true; }); } });
   window.addEventListener('error', ev => { if (!booted) { const l = $('#loading'); if (l && !l.querySelector('#hard-reload')) { l.insertAdjacentHTML('beforeend', '<button type="button" id="hard-reload" style="margin-top:1rem;padding:.8rem 1.2rem;border-radius:.8rem;border:none;background:#FF8A2B;color:#0E1014;font-weight:700">تنظيف وإعادة التحميل</button>'); $('#hard-reload').onclick = hardReload; } } });
   async function hardReload() {

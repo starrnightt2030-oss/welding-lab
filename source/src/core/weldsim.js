@@ -105,7 +105,7 @@ export class WeldSim {
     for (let i = 0; i < this.heat.length; i++) this.heat[i] *= Math.pow(0.55, dt);
 
     if (!input.pressing) {
-      if (this.on) { this.on = false; this.setVisible(false); if (p.kind === 'arc') out.msg = { t: 'info', s: p.pauseMsg || 'وقفت. كمّل من آخر نقطة.' }; }
+      if (this.on) { this.on = false; this.setVisible(false); if (p.kind === 'arc') out.msg = { t: 'info', s: p.pauseMsg || 'توقفت. أكمل من آخر نقطة.' }; }
       this.stuck = false; this.lastX = null;
     } else if (this.stuck) {
       out.stuck = true;
@@ -140,10 +140,10 @@ export class WeldSim {
       const heatOK = !p.heatNeed || this.heatAt(x) >= p.heatNeed;
       let depositing = heatOK;
       if (p.kind === 'cut') {
-        if (input.aux && !heatOK) { if (!this.earlyFlag) { this.events.early++; this.earlyFlag = true; out.msg = { t: 'bad', s: 'لسه الحديد ماوصلش للون الأحمر. سخّن الأول وبعدين افتح أكسجين القطع.' }; } }
+        if (input.aux && !heatOK) { if (!this.earlyFlag) { this.events.early++; this.earlyFlag = true; out.msg = { t: 'bad', s: 'لم يصل الحديد إلى اللون الأحمر بعد. سخّن أولًا، ثم افتح أكسجين القطع.' }; } }
         if (!input.aux) this.earlyFlag = false;
         depositing = heatOK && input.aux;
-        if (depositing && this.speed > p.ideal.speed[1] * 1.8) { depositing = false; if (!this.lostFlag) { this.events.lost++; this.lostFlag = true; out.msg = { t: 'bad', s: 'القطع وقف! السرعة عالية جداً والحرارة ماكفتش. ارجع لآخر نقطة وسخّن تاني.' }; } }
+        if (depositing && this.speed > p.ideal.speed[1] * 1.8) { depositing = false; if (!this.lostFlag) { this.events.lost++; this.lostFlag = true; out.msg = { t: 'bad', s: 'توقف القطع! السرعة عالية جدًا والحرارة غير كافية. ارجع إلى آخر نقطة وسخّن مرة أخرى.' }; } }
         else this.lostFlag = false;
       } else if (p.heatNeed && !heatOK) {
         out.preheat = THREE.MathUtils.clamp(this.heatAt(x) / p.heatNeed, 0, 1);
@@ -384,9 +384,9 @@ export class WeldSim {
     const count = k => bins.filter(b => b.issues && b.issues.includes(k)).length;
     const ctx = { bins, count, events: this.events, settings: this.settings, coverage, sim: this, AR };
     const defects = p.defects ? p.defects(ctx) : [];
-    if (coverage < 0.95) defects.push({ name: p.kind === 'cut' ? 'قطع غير مكتمل' : 'خط غير مكتمل', en: 'Incomplete', cause: (p.kind === 'cut' ? 'القطع' : 'الخط') + ' ما غطاش الطول كله (' + AR(Math.round(coverage * 100)) + '٪).', fix: 'كمّل لحد آخر الخط.' });
+    if (coverage < 0.95) defects.push({ name: p.kind === 'cut' ? 'قطع غير مكتمل' : 'خط غير مكتمل', en: 'Incomplete', cause: (p.kind === 'cut' ? 'القطع' : 'الخط') + ' لم تغطِّ الطول كله (' + AR(Math.round(coverage * 100)) + '٪).', fix: 'أكمل حتى نهاية الخط.' });
     const W = avg(this.ripples.map(r => r.w)) * 1000, H = avg(this.ripples.map(r => r.h)) * 1000;
-    const grade = total >= 90 ? 'ممتاز' : total >= 75 ? 'جيد جداً' : total >= 60 ? 'جيد' : total >= 50 ? 'مقبول' : 'محتاج تدريب';
+    const grade = total >= 90 ? 'ممتاز' : total >= 75 ? 'جيد جداً' : total >= 60 ? 'جيد' : total >= 50 ? 'مقبول' : 'يحتاج إلى تدريب';
     return { total, grade, crit, defects, bins, coverage, width: W, height: H, penetration: p.penetration ? p.penetration(this.settings) : 1, avgSpeed: avg(sv), avgDist: avg(dv), kind: p.kind, distName: p.distName, setNote: set.note };
   }
 }

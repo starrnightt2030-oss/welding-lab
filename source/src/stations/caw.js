@@ -10,26 +10,26 @@ import { ICON } from '../core/icons.js';
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const S = {
   id: 'caw', name: 'اللحام بقوس الكربون', code: 'CAW', icon: ICON.carbon, ready: true,
-  stages: [['explore', 'اتعرّف'], ['assemble', 'ركّب'], ['operate', 'شغّل'], ['weld', 'الحم'], ['inspect', 'افحص']]
+  stages: [['explore', 'تعرّف'], ['assemble', 'ركّب'], ['operate', 'شغّل'], ['weld', 'الحم'], ['inspect', 'افحص']]
 };
 S.parts = [
   { id: 'machine', name: 'مقوّم التيار المستمر', en: 'DC transformer–rectifier', far: 1.1,
-    desc: 'ماكينة تقيلة فيها محوّل ومقوّم بيطلّعوا تيار مستمر ثابت. التيار بيتظبط بطارة اليد، والعدّاد بالإبرة بيبيّن الأمبير. القوس بيتولد بين قطب كربون (جرافيت) والشغلانة، والقطب مابيدوبش.',
-    facts: ['القطب الكربون بيتوصل على السالب (DCEN) عشان يستهلك أبطأ ومايدخّلش كربون في المعدن.'], safety: 'قوس الكربون أشد إضاءة؛ استخدم عدسة ١٢ على الأقل.' },
-  { id: 'sockets', name: 'أطراف التوصيل', en: 'Output terminals', far: 0.45, desc: 'الماسك على السالب والأرضي على الموجب.', facts: ['لو اتعكست القطبية، الكربون بيسخن جداً ويستهلك بسرعة ويتلوّث المعدن بالكربون.'], safety: '' },
+    desc: 'ماكينة ثقيلة فيها محوّل ومقوّم يُخرجان تيارًا مستمرًا ثابتًا. يُضبط التيار بعجلة اليد، ويبيّن العداد ذو الإبرة قيمة الأمبير. يتولد القوس بين قطب من الكربون (الجرافيت) وقطعة العمل، والقطب لا ينصهر.',
+    facts: ['يُوصّل قطب الكربون بالسالب (DCEN) ليُستهلك ببطء ولا يُدخل الكربون في المعدن.'], safety: 'قوس الكربون شديد الإضاءة؛ استخدم عدسة رقم ١٢ على الأقل.' },
+  { id: 'sockets', name: 'أطراف التوصيل', en: 'Output terminals', far: 0.45, desc: 'الماسك على السالب والأرضي على الموجب.', facts: ['إذا انعكست القطبية يسخن الكربون جدًا ويُستهلك بسرعة ويتلوث المعدن بالكربون.'], safety: '' },
   { id: 'holder', name: 'ماسك قطب الكربون', en: 'Carbon electrode holder', far: 0.5,
-    desc: 'ماسك تقيل بفكوك نحاس وواقي حراري، بيمسك قطب الكربون من نص طوله تقريباً.', facts: ['طول الكربون الطالع من الماسك حوالي ٥٠–٧٥ مم.'], safety: 'الماسك بيسخن جداً؛ استخدم جوانتي جلد تقيل.' },
-  { id: 'carbon', name: 'قطب الكربون (جرافيت)', en: 'Carbon / graphite electrode', far: 0.35,
-    desc: 'قطب من الجرافيت، غالباً مطلي نحاس عشان يوصّل التيار أحسن ويستهلك أبطأ. طرفه بيتبرى مخروطي.',
-    facts: ['أقطار شائعة: ٦، ٨، ١٠ مم.', 'بيستهلك ببطء بالأكسدة، مش بالانصهار.'], safety: '' },
-  { id: 'rods', name: 'سلك الإضافة', en: 'Filler rods', far: 0.4, desc: 'بيتغمس في البركة باليد التانية زي لحام الغاز.', facts: [], safety: '' },
+    desc: 'ماسك ثقيل بفكوك نحاسية وواقٍ حراري، يمسك قطب الكربون من منتصف طوله تقريبًا.', facts: ['يبرز الكربون من الماسك بطول ٥٠–٧٥ مم تقريبًا.'], safety: 'الماسك يسخن جدًا؛ استخدم قفازًا جلديًا ثقيلًا.' },
+  { id: 'carbon', name: 'قطب الكربون (الجرافيت)', en: 'Carbon / graphite electrode', far: 0.35,
+    desc: 'قطب من الجرافيت، غالبًا مطلي بالنحاس ليوصّل التيار أفضل ويُستهلك ببطء. يُبرى طرفه على شكل مخروط.',
+    facts: ['أقطار شائعة: ٦ و٨ و١٠ مم.', 'يُستهلك ببطء بالأكسدة، وليس بالانصهار.'], safety: '' },
+  { id: 'rods', name: 'سلك الإضافة', en: 'Filler rods', far: 0.4, desc: 'يُغمس في البركة باليد الأخرى كما في لحام الغاز.', facts: [], safety: '' },
   { id: 'twin', name: 'تورش الكربون المزدوج', en: 'Twin-carbon torch', far: 0.4,
-    desc: 'قطبين كربون والقوس بينهم هما الاتنين (تيار متردد)، والشغلانة مش جزء من الدايرة. بيستخدم كمصدر حرارة للحام النحاس والتشكيل واللحام بالمونة.', facts: [], safety: '' },
-  { id: 'gouge', name: 'القطع والتشطيف بالكربون والهوا', en: 'Air-carbon arc gouging', far: 0.4,
-    desc: 'نفس فكرة القوس الكربوني بس معاه نفث هوا مضغوط بيطرد المعدن المنصهر؛ بنستخدمه لفتح مجاري وإزالة لحامات معيبة.',
-    facts: ['بيشتغل على القطبية العكسية DCEP مع ضاغط هوا ٥–٧ بار.'], safety: 'صوت عالي جداً ورذاذ معدن كتير؛ واقي سمع ووش كامل.' },
-  { id: 'clamp', name: 'ماسك الأرضي', en: 'Work clamp', far: 0.4, desc: 'متوصّل على الموجب في الطريقة دي.', facts: [], safety: '' },
-  { id: 'plates', name: 'قطع الشغل', en: 'Thin sheet 2 mm', far: 0.4, desc: 'صاج رفيع ٢ مم. قوس الكربون مناسب للصاج الرفيع لأن الحرارة أهدى ومنتشرة.', facts: [], safety: '' }
+    desc: 'قطبان من الكربون والقوس بينهما (تيار متردد)، وقطعة العمل ليست جزءًا من الدائرة. يُستخدم مصدرًا للحرارة في لحام النحاس والتشكيل واللحام بالمونة.', facts: [], safety: '' },
+  { id: 'gouge', name: 'القطع والتشطيف بالكربون والهواء', en: 'Air-carbon arc gouging', far: 0.4,
+    desc: 'نفس فكرة قوس الكربون مع نفث هواء مضغوط يطرد المعدن المنصهر؛ ويُستخدم لفتح المجاري وإزالة اللحامات المعيبة.',
+    facts: ['يعمل بالقطبية العكسية DCEP مع ضاغط هواء ٥–٧ بار.'], safety: 'صوت عالٍ جدًا ورذاذ معدن كثير؛ استخدم واقي السمع وواقي الوجه الكامل.' },
+  { id: 'clamp', name: 'ماسك الأرضي', en: 'Work clamp', far: 0.4, desc: 'يُوصّل بالموجب في هذه الطريقة.', facts: [], safety: '' },
+  { id: 'plates', name: 'قطع العمل', en: 'Thin sheet 2 mm', far: 0.4, desc: 'صاج رقيق سُمك ٢ مم. قوس الكربون مناسب للصاج الرقيق لأن حرارته أهدأ وموزّعة.', facts: [], safety: '' }
 ];
 
 let ctxRef, m, holder, carbon, clamp, plugH, plugG, cableH, cableG, cbox, rods, rod, twin, gouge;
@@ -215,11 +215,11 @@ S.cams = {
 };
 
 S.asmSteps = [
-  { id: 'power', title: 'اطفي الماكينة', hint: 'المس مفتاح التشغيل.' },
-  { id: 'plugH', title: 'وصّل كابل الماسك بالسالب (−)', hint: 'المس فيشة الماسك، وبعدين الطرف المناسب.' },
-  { id: 'plugG', title: 'وصّل كابل الأرضي بالموجب (+)', hint: 'المس فيشة الأرضي، وبعدين الطرف الفاضي.' },
+  { id: 'power', title: 'أطفئ الماكينة', hint: 'المس مفتاح التشغيل.' },
+  { id: 'plugH', title: 'وصّل كابل الماسك بالسالب (−)', hint: 'المس قابس الماسك، ثم الطرف المناسب.' },
+  { id: 'plugG', title: 'وصّل كابل الأرضي بالموجب (+)', hint: 'المس قابس الأرضي، ثم الطرف الفارغ.' },
   { id: 'clamp', title: 'ثبّت ماسك الأرضي على الطاولة', hint: 'المس ماسك الأرضي.' },
-  { id: 'carbon', title: 'ركّب قطب الكربون (مبري مخروطي) وطلّعه ٧٥ مم', hint: 'المس علبة أقطاب الكربون.' }
+  { id: 'carbon', title: 'ركّب قطب الكربون (مبري مخروطيًا) وأخرجه ٧٥ مم', hint: 'المس علبة أقطاب الكربون.' }
 ];
 S.asmStart = () => setPower(true);
 S.asmTargets = (step, ctx) => {
@@ -234,22 +234,22 @@ function moveObj(ctx, obj, toP, toR, dur, done0) {
 }
 S.asmPick = (id, ctx, r) => {
   const a = ctx.state.asm, s = S.asmSteps[a.step]; if (!s) return;
-  if (st.power && s.id !== 'power' && id !== 'switch') return ctx.asmMsg('bad', 'اطفي الماكينة الأول.');
+  if (st.power && s.id !== 'power' && id !== 'switch') return ctx.asmMsg('bad', 'أطفئ الماكينة أولًا.');
   switch (s.id) {
-    case 'power': if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة مطفية.'); } else ctx.asmMsg('bad', 'اطفي الماكينة الأول.'); break;
+    case 'power': if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة مطفأة.'); } else ctx.asmMsg('bad', 'أطفئ الماكينة أولًا.'); break;
     case 'plugH': case 'plugG': {
       const isH = s.id === 'plugH', plug = isH ? plugH : plugG;
-      if (!a.picked) { if (id === s.id) { a.picked = true; ctx.asmMsg('info', 'المس الطرف المناسب.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', 'المس الفيشة الصح الأول.'); return; }
+      if (!a.picked) { if (id === s.id) { a.picked = true; ctx.asmMsg('info', 'المس الطرف المناسب.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', 'المس القابس الصحيح أولًا.'); return; }
       if (id !== 'sockets') return ctx.asmMsg('bad', 'المس طرف توصيل.');
       const which = r && r.object === m.sockets.plus ? 'plus' : 'minus';
-      if (isH && which === 'plus') return ctx.asmMsg('bad', 'لأ! في لحام الكربون الماسك على السالب (DCEN). على الموجب الكربون هيسخن ويستهلك بسرعة ويلوّث المعدن.');
-      if (!isH && which === 'minus') return ctx.asmMsg('bad', 'السالب عليه الماسك. الأرضي على الموجب.');
+      if (isH && which === 'plus') return ctx.asmMsg('bad', 'لا! في لحام الكربون يكون الماسك على السالب (DCEN). على الموجب سيسخن الكربون ويُستهلك بسرعة ويلوّث المعدن.');
+      if (!isH && which === 'minus') return ctx.asmMsg('bad', 'الماسك على السالب، والأرضي على الموجب.');
       a.picked = null; ctx.E.setHighlight([]);
       moveObj(ctx, plug, sockW(which), new THREE.Euler(0, 0, 0), 1, () => { asm[s.id] = true; ctx.audio.sfx('clunk'); ctx.next(isH ? 'الماسك على السالب (DCEN).' : 'الأرضي على الموجب.'); });
       break;
     }
-    case 'clamp': if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1, () => { asm.clamp = true; updateCables(); ctx.next('ماسك الأرضي متثبّت.'); }); } else ctx.asmMsg('bad', 'المس ماسك الأرضي.'); break;
-    case 'carbon': if (id === 'cbox') { carbon.visible = true; carbon.userData.set(0.15, st.dia); asm.carbon = true; ctx.next('قطب الكربون اتركّب وطرفه مبري مخروطي.'); } else ctx.asmMsg('bad', 'المس علبة أقطاب الكربون.'); break;
+    case 'clamp': if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1, () => { asm.clamp = true; updateCables(); ctx.next('تم تثبيت ماسك الأرضي.'); }); } else ctx.asmMsg('bad', 'المس ماسك الأرضي.'); break;
+    case 'carbon': if (id === 'cbox') { carbon.visible = true; carbon.userData.set(0.15, st.dia); asm.carbon = true; ctx.next('تم تركيب قطب الكربون وطرفه مبري مخروطيًا.'); } else ctx.asmMsg('bad', 'المس علبة أقطاب الكربون.'); break;
   }
 };
 S.asmAuto = ctx => {
@@ -261,17 +261,17 @@ S.asmAuto = ctx => {
 
 S.operateEnter = () => updateMachine();
 S.operatePick = (id, ctx) => { if (id === 'switch') { setPower(!st.power); ctx.renderPanel(); } };
-const status = () => { const [lo, hi] = RANGE[st.dia], c = st.current; return c < lo ? ['low', 'قليل'] : c > hi ? ['high', 'عالي'] : ['ok', 'مظبوط']; };
+const status = () => { const [lo, hi] = RANGE[st.dia], c = st.current; return c < lo ? ['low', 'منخفض'] : c > hi ? ['high', 'عالٍ'] : ['ok', 'مضبوط']; };
 S.operateHTML = () => {
   const [lo, hi] = RANGE[st.dia], s = status();
   return `
     <section class="card"><h3 class="sm">قطر قطب الكربون</h3><div class="seg3">${[6, 8, 10].map(d => `<button type="button" class="${st.dia === d ? 'on' : ''}" data-op="dia:${d}"><span class="mono">${d}</span> مم</button>`).join('')}</div></section>
     <section class="card"><div class="ph"><h3 class="sm">شدة التيار</h3><span class="tag ${s[0]}">${lo}–${hi} A</span></div>
-      <div class="cur-ctl"><button type="button" class="round" data-op="cur-" aria-label="قلّل">${ICON.minus}</button><div class="cur-val"><span class="mono">${st.current}</span><small class="mono">A</small></div><button type="button" class="round acc" data-op="cur+" aria-label="زوّد">${ICON.plus}</button></div>
+      <div class="cur-ctl"><button type="button" class="round" data-op="cur-" aria-label="قلّل">${ICON.minus}</button><div class="cur-val"><span class="mono">${st.current}</span><small class="mono">A</small></div><button type="button" class="round acc" data-op="cur+" aria-label="زِد">${ICON.plus}</button></div>
       <input type="range" min="40" max="200" step="5" value="${st.current}" data-op="current" aria-label="التيار"></section>
-    <section class="card"><h3 class="sm">القطبية</h3><p class="small">الكربون على السالب = <b class="mono accent">DCEN</b>. الحرارة الأكبر في الشغلانة، والكربون يستهلك ببطء.</p></section>
-    <section class="card"><h3 class="sm">مهمات الوقاية (عدسة ١٢)</h3><div class="ppe">${PPE.map(p => `<button type="button" class="${st.ppe[p.id] ? 'on' : ''}" data-op="ppe:${p.id}">${st.ppe[p.id] ? ICON.check : ICON.shield}${p.id === 'helmet' ? 'ماسك بعدسة ١٢' : p.name}</button>`).join('')}</div></section>
-    <button type="button" class="btn ${st.power ? 'on-green' : ''}" data-op="power">${ICON.bolt}${st.power ? 'الماكينة شغالة' : 'شغّل الماكينة'}</button>`;
+    <section class="card"><h3 class="sm">القطبية</h3><p class="small">الكربون على السالب = <b class="mono accent">DCEN</b>. الحرارة الأكبر في قطعة العمل، والكربون يُستهلك ببطء.</p></section>
+    <section class="card"><h3 class="sm">مهمات الوقاية (عدسة ١٢)</h3><div class="ppe">${PPE.map(p => `<button type="button" class="${st.ppe[p.id] ? 'on' : ''}" data-op="ppe:${p.id}">${st.ppe[p.id] ? ICON.check : ICON.shield}${p.id === 'helmet' ? 'قناع بعدسة ١٢' : p.name}</button>`).join('')}</div></section>
+    <button type="button" class="btn ${st.power ? 'on-green' : ''}" data-op="power">${ICON.bolt}${st.power ? 'الماكينة تعمل' : 'شغّل الماكينة'}</button>`;
 };
 S.operateAction = (op, el, ctx) => {
   if (op === 'range:current') { st.current = +el.value; updateMachine(); clearTimeout(S._t); S._t = setTimeout(() => ctx.renderPanel(), 150); return; }
@@ -283,7 +283,7 @@ S.operateAction = (op, el, ctx) => {
 };
 S.operateReady = () => {
   const ok = status()[0] === 'ok', ppe = PPE.every(p => st.ppe[p.id]);
-  return { ok: ok && ppe && st.power, label: !ppe ? 'البس مهمات الوقاية' : !st.power ? 'شغّل الماكينة' : !ok ? 'اظبط التيار' : 'ابدأ اللحام' };
+  return { ok: ok && ppe && st.power, label: !ppe ? 'ارتدِ مهمات الوقاية' : !st.power ? 'شغّل الماكينة' : !ok ? 'اضبط التيار' : 'ابدأ اللحام' };
 };
 
 S.weldSettings = () => ({ ...st });
@@ -293,9 +293,9 @@ S.weldProc = () => {
     kind: 'arc', distName: 'طول القوس', angleName: 'زاوية القطب', settingName: 'ضبط التيار', angleShort: 'زاوية القطب',
     ideal: { angle: [60, 75], speed: [1.5, 3.2], dist: [5, 8] }, idealStart: 6.5,
     strikeBelow: 9.5, stickBelow: 1.2, breakAbove: 13, grace: 0.25,
-    stickMsg: 'الكربون لمس البركة! ده بيدخّل كربون في المعدن ويخليه هش. ارفع وكمّل.',
-    breakMsg: 'القوس طويل جداً واتقطع.',
-    consumable: { len: 0.15, min: 0.04, rate: s => (s.current / 120) * 0.35 / 1000, name: 'الكربون', newName: 'كربون جديد', outMsg: 'قطب الكربون قصر. ركّب واحد جديد.', newMsg: 'ركّبت قطب كربون جديد.' },
+    stickMsg: 'لمس الكربون البركة! هذا يُدخل الكربون في المعدن ويجعله هشًّا. ارفع وأكمل.',
+    breakMsg: 'القوس طويل جدًا وانقطع.',
+    consumable: { len: 0.15, min: 0.04, rate: s => (s.current / 120) * 0.35 / 1000, name: 'الكربون', newName: 'كربون جديد', outMsg: 'قطب الكربون قَصُر. ركّب قطبًا جديدًا.', newMsg: 'تم تركيب قطب كربون جديد.' },
     fillerLen: 0.6, aux: { label: 'سلك الإضافة', hint: 'اغمس في البركة', icon: ICON.plus },
     spacing: 0.0012, distPerMM: 0.55, relDistPerPx: 0.05, arcColor: 0xfff0d6, arcSize: 0.05, lightIntensity: 0.45, smoke: 3,
     bead: { color: [0.6, 0.58, 0.55], hot: [3, 1.4, 0.4], metal: 0.7, rough: 0.45, tint: (r, i, n, c) => c.setRGB(0.5, 0.48, 0.46) },
@@ -309,14 +309,14 @@ S.weldProc = () => {
     penetration: set => THREE.MathUtils.clamp(((set.current - lo) / (hi - lo)) * 0.5 + 0.7, 0.3, 1.3),
     defects: c => {
       const out = [];
-      if (c.events.stuck) out.push({ name: 'تكربن المعدن', en: 'Carbon pickup', cause: 'الكربون لمس البركة ' + c.AR(c.events.stuck) + ' مرة.', fix: 'حافظ على طول قوس ٥–٨ مم.' });
-      if (c.count('nofill')) out.push({ name: 'نقص امتلاء', en: 'Underfill', cause: 'ماضفتش سلك كفاية.', fix: 'اغمس السلك بانتظام.' });
-      if (c.count('fast')) out.push({ name: 'عدم انصهار', en: 'Lack of fusion', cause: 'السرعة عالية.', fix: 'بطّأ.' });
+      if (c.events.stuck) out.push({ name: 'تكربُن المعدن', en: 'Carbon pickup', cause: 'لمس الكربون البركة ' + c.AR(c.events.stuck) + ' مرة.', fix: 'حافظ على طول قوس ٥–٨ مم.' });
+      if (c.count('nofill')) out.push({ name: 'نقص امتلاء', en: 'Underfill', cause: 'لم تُضف سلكًا كافيًا.', fix: 'اغمس السلك بانتظام.' });
+      if (c.count('fast')) out.push({ name: 'عدم انصهار', en: 'Lack of fusion', cause: 'السرعة عالية.', fix: 'أبطئ.' });
       if (c.count('long')) out.push({ name: 'قوس طويل وغير مستقر', en: 'Wandering arc', cause: 'القوس أطول من ٨ مم.', fix: 'قرّب الكربون.' });
-      if (st.current > hi) out.push({ name: 'سيحان الصاج', en: 'Burn-through', cause: 'التيار عالي على صاج ٢ مم.', fix: 'قلّل التيار.' });
+      if (st.current > hi) out.push({ name: 'انصهار الصاج', en: 'Burn-through', cause: 'التيار عالٍ على صاج ٢ مم.', fix: 'قلّل التيار.' });
       return out;
     },
-    hint: 'المس بداية الوصلة واسحب ببطء. القوس هنا أطول من القطب المعدني (٥–٨ مم). اغمس السلك بالزرار.'
+    hint: 'المس بداية الوصلة واسحب ببطء. القوس هنا أطول من القطب المعدني (٥–٨ مم). اغمس السلك بالزر.'
   };
 };
 S.hud = ctx => {
@@ -330,10 +330,10 @@ S.hud = ctx => {
 };
 S.coach = (ctx, o) => {
   const w = ctx.state.weld;
-  if (o.speed > 3.8) return 'بطّأ';
-  if (o.speed < 1 && ctx.sim.time > 2) return 'اتحرك شوية';
+  if (o.speed > 3.8) return 'أبطئ';
+  if (o.speed < 1 && ctx.sim.time > 2) return 'تحرّك قليلًا';
   if (w.eff > 8.6) return 'القوس طويل، قرّب';
-  if (w.eff < 4.4) return 'القوس قصير، الكربون قرب يلمس';
+  if (w.eff < 4.4) return 'القوس قصير، الكربون يكاد يلمس';
   if (ctx.sim.time > 3 && !w.aux && Math.random() < 0.015) return 'اغمس سلك الإضافة';
   return null;
 };

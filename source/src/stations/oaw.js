@@ -11,48 +11,48 @@ const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
 const S = {
   id: 'oaw', name: 'اللحام والقطع بالغاز', code: 'OAW / OFC', icon: ICON.flame, ready: true,
-  stages: [['explore', 'اتعرّف'], ['assemble', 'ركّب'], ['operate', 'ولّع واضبط'], ['weld', 'الحم / اقطع'], ['inspect', 'افحص']]
+  stages: [['explore', 'تعرّف'], ['assemble', 'ركّب'], ['operate', 'أشعل واضبط'], ['weld', 'الحم / اقطع'], ['inspect', 'افحص']]
 };
 
 S.parts = [
   { id: 'cylO', name: 'أسطوانة الأكسجين', en: 'Oxygen cylinder', far: 1.1,
-    desc: 'أسطوانة صلب طويلة مملوءة أكسجين مضغوط (حوالي ١٥٠–٢٠٠ بار). الأكسجين نفسه مش بيولّع لكنه بيساعد أي حاجة على الاشتعال بعنف.',
-    facts: ['لونها المعتمد عندنا: جسم أسود وكتف أبيض (حسب المواصفة).', 'صمامها بيتفتح للآخر وقت الشغل عشان الحشو مايسرّبش.'],
-    safety: 'ممنوع الزيت والشحم نهائياً على صمامات ووصلات الأكسجين؛ ممكن يولّع وينفجر.' },
+    desc: 'أسطوانة صلب طويلة مملوءة بالأكسجين المضغوط (حوالي ١٥٠–٢٠٠ بار). الأكسجين نفسه لا يشتعل، لكنه يساعد أي مادة على الاشتعال بعنف.',
+    facts: ['لونها المعتمد لدينا: جسم أسود وكتف أبيض (حسب المواصفة).', 'يُفتح صمامها بالكامل أثناء العمل حتى لا يسرّب الحشو.'],
+    safety: 'يُمنع الزيت والشحم نهائيًا على صمامات الأكسجين ووصلاته؛ فقد يشتعل وينفجر.' },
   { id: 'cylA', name: 'أسطوانة الأسيتيلين', en: 'Acetylene cylinder', far: 1.0,
-    desc: 'الأسيتيلين غاز قابل للاشتعال، ومذاب جوه الأسطوانة في مادة الأسيتون مع حشو مسامي عشان مايبقاش خطر تحت الضغط.',
-    facts: ['ضغطها حوالي ١٥–١٨ بار بس، ولونها أحمر طوبي (مارون).', 'لازم تفضل واقفة رأسياً عشان الأسيتون مايطلعش مع الغاز.', 'صمامها بيتفتح ربع لنص لفة بس، والمفتاح يفضل عليه عشان القفل السريع.'],
-    safety: 'ضغط تشغيل الأسيتيلين ماينفعش يعدّي ١ بار (١٥ psi)؛ فوق كده بيبقى غير مستقر ومعرّض للانفجار.' },
-  { id: 'chain', name: 'جنزير التثبيت والعربة', en: 'Cylinder cart & chain', far: 0.9,
-    desc: 'عربة بعجلتين بتشيل الأسطوانتين مع بعض، وجنزير بيربطهم عشان مايقعوش.',
-    facts: ['الأسطوانة لو وقعت والصمام اتكسر ممكن تتحول لصاروخ.'], safety: 'اربط الأسطوانات دايماً، حتى لو هتستخدمها دقايق.' },
+    desc: 'الأسيتيلين غاز قابل للاشتعال، ومذاب داخل الأسطوانة في مادة الأسيتون مع حشو مسامي حتى لا يكون خطرًا تحت الضغط.',
+    facts: ['ضغطها حوالي ١٥–١٨ بار فقط، ولونها أحمر طوبي (مارون).', 'يجب أن تظل واقفة رأسيًا حتى لا يخرج الأسيتون مع الغاز.', 'يُفتح صمامها من ربع إلى نصف لفة فقط، ويظل المفتاح عليه للإغلاق السريع.'],
+    safety: 'ضغط تشغيل الأسيتيلين يجب ألا يتجاوز ١ بار (١٥ psi)؛ فوق ذلك يصبح غير مستقر ومعرّضًا للانفجار.' },
+  { id: 'chain', name: 'سلسلة التثبيت والعربة', en: 'Cylinder cart & chain', far: 0.9,
+    desc: 'عربة بعجلتين تحمل الأسطوانتين معًا، وسلسلة تربطهما حتى لا تسقطا.',
+    facts: ['إذا سقطت الأسطوانة وانكسر الصمام فقد تتحول إلى صاروخ.'], safety: 'اربط الأسطوانات دائمًا، حتى لو ستستخدمها دقائق.' },
   { id: 'valves', name: 'صمامات الأسطوانات', en: 'Cylinder valves', far: 0.45,
-    desc: 'صمام الأكسجين بطارة يد، وصمام الأسيتيلين بمفتاح مربع. قبل تركيب المنظم بنفتح الصمام ونقفله بسرعة عشان ننضّف المخرج من التراب.',
-    facts: ['العملية دي اسمها «تنظيف الصمام» (Cracking).'], safety: 'وقف جنب مخرج الصمام مش قدامه وانت بتفتحه.' },
+    desc: 'صمام الأكسجين بعجلة يد، وصمام الأسيتيلين بمفتاح مربع. قبل تركيب المنظم نفتح الصمام ونغلقه بسرعة لتنظيف المخرج من الأتربة.',
+    facts: ['تُسمّى هذه العملية «تنظيف الصمام» (Cracking).'], safety: 'قف بجانب مخرج الصمام وليس أمامه أثناء فتحه.' },
   { id: 'regO', name: 'منظم الأكسجين', en: 'Oxygen regulator', far: 0.42,
-    desc: 'بيخفّض ضغط الأسطوانة العالي لضغط تشغيل ثابت. فيه عدادين: عداد المحتوى (ضغط الأسطوانة) وعداد التشغيل (الضغط الخارج للبوري).',
-    facts: ['وصلته سن يمين عادي.', 'بنزوّد ضغط التشغيل بلف المسمار (الطارة) مع عقارب الساعة.'], safety: 'فك مسمار الضبط قبل ما تفتح صمام الأسطوانة عشان العداد مايتضربش.' },
+    desc: 'يخفض ضغط الأسطوانة العالي إلى ضغط تشغيل ثابت. فيه عدادان: عداد المحتوى (ضغط الأسطوانة) وعداد التشغيل (الضغط الخارج إلى البوري).',
+    facts: ['وصلته ذات سن يمين عادي.', 'نزيد ضغط التشغيل بإدارة مسمار الضبط مع عقارب الساعة.'], safety: 'فُكّ مسمار الضبط قبل فتح صمام الأسطوانة حتى لا يتلف العداد.' },
   { id: 'regA', name: 'منظم الأسيتيلين', en: 'Acetylene regulator', far: 0.42,
-    desc: 'نفس فكرة منظم الأكسجين، بس عداد التشغيل بتاعه فيه منطقة حمرا فوق ١ بار.',
-    facts: ['وصلته سن شمال، والصامولة عليها حزّة (علامة) عشان تتعرف إنها غاز وقود.'], safety: 'ماتشتغلش أبداً بضغط أسيتيلين فوق ١ بار.' },
+    desc: 'نفس فكرة منظم الأكسجين، لكن عداد التشغيل فيه منطقة حمراء فوق ١ بار.',
+    facts: ['وصلته ذات سن شمال، وعلى الصامولة حزّة تدل على أنها لغاز الوقود.'], safety: 'لا تعمل أبدًا بضغط أسيتيلين فوق ١ بار.' },
   { id: 'arrest', name: 'صمامات منع الارتداد', en: 'Flashback arrestors', far: 0.4,
-    desc: 'بتمنع اللهب لو رجع لجوه الخرطوم إنه يوصل للمنظم أو الأسطوانة، وكمان بتمنع رجوع الغاز.',
-    facts: ['بتتركب على مخرج كل منظم، وأحياناً كمان عند مقبض البوري.'], safety: 'ممنوع تشغيل جهاز غاز من غير صمامات منع الارتداد.' },
+    desc: 'تمنع اللهب إذا ارتد داخل الخرطوم من الوصول إلى المنظم أو الأسطوانة، وتمنع أيضًا رجوع الغاز.',
+    facts: ['تُركّب على مخرج كل منظم، وأحيانًا أيضًا عند مقبض البوري.'], safety: 'يُمنع تشغيل جهاز الغاز بدون صمامات منع الارتداد.' },
   { id: 'hoses', name: 'الخراطيم', en: 'Twin hoses', far: 0.95,
     desc: 'خرطوم أزرق للأكسجين، وخرطوم أحمر للأسيتيلين.',
-    facts: ['وصلة خرطوم الأسيتيلين سن شمال برضه.'], safety: 'افحص الخراطيم من التشقق، وماتحطهاش تحت الشرار أو الحديد السخن.' },
+    facts: ['وصلة خرطوم الأسيتيلين ذات سن شمال أيضًا.'], safety: 'افحص الخراطيم من التشقق، ولا تضعها تحت الشرر أو الحديد الساخن.' },
   { id: 'torch', name: 'بوري اللحام', en: 'Welding torch (blowpipe)', far: 0.42,
-    desc: 'المقبض فيه صمامين (أحمر للأسيتيلين وأزرق للأكسجين) وغرفة خلط، وفي آخره البُشبُوري (الفونية). حجم الفونية بيتحدد حسب سُمك المعدن.',
-    facts: ['الإشعال: افتح الأسيتيلين الأول وولّع، وبعدين زوّد الأكسجين.', 'الإطفاء: اقفل الأسيتيلين الأول وبعدين الأكسجين.'], safety: 'لو سمعت صفير أو فرقعة جوه البوري (ارتداد لهب) اقفل الأكسجين فوراً وبعده الأسيتيلين.' },
+    desc: 'في المقبض صمامان (أحمر للأسيتيلين وأزرق للأكسجين) وغرفة خلط، وفي نهايته الفونية. يُحدد حجم الفونية حسب سُمك المعدن.',
+    facts: ['الإشعال: افتح الأسيتيلين أولًا وأشعل، ثم زِد الأكسجين.', 'الإطفاء: أغلق الأسيتيلين أولًا، ثم الأكسجين.'], safety: 'إذا سمعت صفيرًا أو فرقعة داخل البوري (ارتداد اللهب) أغلق الأكسجين فورًا، ثم الأسيتيلين.' },
   { id: 'cutter', name: 'بوري القطع', en: 'Cutting attachment', far: 0.42,
-    desc: 'بيسخّن الحديد لدرجة الاحمرار بلهب التسخين، وبعدين ذراع أكسجين القطع بيطلع تيار أكسجين نقي يأكسد الحديد ويطرده.',
-    facts: ['القطع بالأكسجين ينفع للصلب الكربوني بس، مش للألومنيوم أو الاستانلس.'], safety: 'الشرار بيطير لمسافات بعيدة تحت القطعة؛ أبعد أي مواد قابلة للاشتعال.' },
-  { id: 'lighter', name: 'الولاعة الحجر', en: 'Spark lighter', far: 0.35,
-    desc: 'بنولّع بيها البوري بأمان.', facts: [], safety: 'ممنوع تولّع البوري بالكبريت أو الولاعة العادية.' },
+    desc: 'يسخّن الحديد حتى الاحمرار بلهب التسخين، ثم يُخرج ذراع أكسجين القطع تيارًا من الأكسجين النقي يؤكسد الحديد ويطرده.',
+    facts: ['القطع بالأكسجين يصلح للصلب الكربوني فقط، وليس للألومنيوم أو الصلب الذي لا يصدأ.'], safety: 'يتطاير الشرر لمسافات بعيدة تحت القطعة؛ أبعِد أي مواد قابلة للاشتعال.' },
+  { id: 'lighter', name: 'الولاعة ذات الحجر', en: 'Spark lighter', far: 0.35,
+    desc: 'نُشعل بها البوري بأمان.', facts: [], safety: 'يُمنع إشعال البوري بالكبريت أو بالولاعة العادية.' },
   { id: 'rods', name: 'أسلاك الإضافة', en: 'Filler rods', far: 0.4,
-    desc: 'أسلاك صلب مطلية نحاس، بتتغمس في البركة المنصهرة عشان تملا الوصلة.', facts: ['قطر السلك تقريباً نص سُمك الصاج + ١ مم.'], safety: '' },
+    desc: 'أسلاك من الصلب مطلية بالنحاس، تُغمس في البركة المنصهرة لملء الوصلة.', facts: ['قطر السلك تقريبًا نصف سُمك الصاج + ١ مم.'], safety: '' },
   { id: 'goggles', name: 'نظارة لحام الغاز', en: 'Gas welding goggles (shade 5)', far: 0.32,
-    desc: 'نظارة بعدسة درجة ٤–٦ لحماية العين من ضوء اللهب والشرار. أخف من عدسة ماسك لحام القوس.', facts: [], safety: 'ماتستخدمهاش في لحام القوس الكهربي؛ مش كفاية.' }
+    desc: 'نظارة بعدسة درجة ٤–٦ لحماية العين من ضوء اللهب والشرر. وهي أخف من عدسة قناع لحام القوس.', facts: [], safety: 'لا تستخدمها في لحام القوس الكهربائي؛ فهي غير كافية.' }
 ];
 S.exploreMap = { valveO: 'valves', valveA: 'valves', hoseO: 'hoses', hoseA: 'hoses', arrO: 'arrest', arrA: 'arrest', soap: 'lighter' };
 
@@ -260,13 +260,13 @@ S.explodeItems = () => [
 
 // ----- assemble
 S.asmSteps = [
-  { id: 'chain', title: 'اربط الأسطوانات بالجنزير', hint: 'المس الأسطوانات أو العربة عشان تربطهم بالجنزير.' },
-  { id: 'crack', title: 'نضّف مخارج الصمامات (فتح وقفل سريع)', hint: 'المس صمام كل أسطوانة. خليك واقف جنب المخرج مش قدامه.' },
-  { id: 'regO', title: 'ركّب منظم الأكسجين على أسطوانته', hint: 'المس المنظم الأزرق اللي على الرف، وبعدين الأسطوانة المناسبة.' },
-  { id: 'regA', title: 'ركّب منظم الأسيتيلين (سن شمال)', hint: 'المس المنظم الأحمر، وبعدين أسطوانة الأسيتيلين.' },
-  { id: 'arrest', title: 'ركّب صمامات منع الارتداد على المنظمات', hint: 'المس كل منظم عشان تركّب عليه صمام منع الارتداد.' },
-  { id: 'hoses', title: 'وصّل الخراطيم: الأزرق للأكسجين، الأحمر للأسيتيلين', hint: 'المس طرف خرطوم من الأرض، وبعدين المنظم المناسب له.' },
-  { id: 'torchClosed', title: 'اتأكد إن صمامات البوري مقفولة', hint: 'المس البوري عشان تتأكد إن الصمامين مقفولين قبل ما تفتح الأسطوانات.' }
+  { id: 'chain', title: 'اربط الأسطوانات بالسلسلة', hint: 'المس الأسطوانات أو العربة لتربطها بالسلسلة.' },
+  { id: 'crack', title: 'نظّف مخارج الصمامات (فتح وإغلاق سريع)', hint: 'المس صمام كل أسطوانة. قف بجانب المخرج وليس أمامه.' },
+  { id: 'regO', title: 'ركّب منظم الأكسجين على أسطوانته', hint: 'المس المنظم الأزرق الموجود على الرف، ثم الأسطوانة المناسبة.' },
+  { id: 'regA', title: 'ركّب منظم الأسيتيلين (سن شمال)', hint: 'المس المنظم الأحمر، ثم أسطوانة الأسيتيلين.' },
+  { id: 'arrest', title: 'ركّب صمامات منع الارتداد على المنظمات', hint: 'المس كل منظم لتركّب عليه صمام منع الارتداد.' },
+  { id: 'hoses', title: 'وصّل الخراطيم: الأزرق للأكسجين، والأحمر للأسيتيلين', hint: 'المس طرف خرطوم من الأرض، ثم المنظم المناسب له.' },
+  { id: 'torchClosed', title: 'تأكد أن صمامات البوري مغلقة', hint: 'المس البوري لتتأكد أن الصمامين مغلقان قبل فتح الأسطوانات.' }
 ];
 S.asmStart = () => { asm.crackO = asm.crackA = false; st.lit = false; };
 S.asmTargets = (step, ctx) => {
@@ -299,8 +299,8 @@ S.asmPick = (id, ctx) => {
     case 'chain':
       if (['cylO', 'cylA', 'chain'].includes(id)) {
         chain.visible = true;
-        ctx.state.asm.busy = true; ctx.E.tween(0.6, k => chain.scale.setScalar(Math.max(0.001, k)), () => { ctx.state.asm.busy = false; asm.chain = true; ctx.audio.click(); ctx.next('الأسطوانات متربطة كويس في العربة.'); });
-      } else ctx.asmMsg('bad', 'الأول اربط الأسطوانات؛ الأسطوانة اللي بتقع ممكن صمامها يتكسر.');
+        ctx.state.asm.busy = true; ctx.E.tween(0.6, k => chain.scale.setScalar(Math.max(0.001, k)), () => { ctx.state.asm.busy = false; asm.chain = true; ctx.audio.click(); ctx.next('الأسطوانات مربوطة جيدًا في العربة.'); });
+      } else ctx.asmMsg('bad', 'اربط الأسطوانات أولًا؛ فالأسطوانة التي تسقط قد ينكسر صمامها.');
       break;
     case 'crack':
       if (id === 'valveO' || id === 'valveA') {
@@ -308,25 +308,25 @@ S.asmPick = (id, ctx) => {
         if (asm[isO ? 'crackO' : 'crackA']) return;
         asm[isO ? 'crackO' : 'crackA'] = true;
         puffAt(outletWorld(isO ? cylO : cylA), ctx); ctx.audio.sfx('hiss');
-        if (asm.crackO && asm.crackA) ctx.next('اتنضّفوا الاتنين. لو في تراب في المخرج كان هيدخل المنظم ويبوّظه.');
-        else { ctx.asmMsg('good', isO ? 'صمام الأكسجين اتنضّف. فاضل الأسيتيلين.' : 'صمام الأسيتيلين اتنضّف. فاضل الأكسجين.'); refresh(); }
-      } else ctx.asmMsg('bad', 'المس صمام الأسطوانة نفسه (فوق خالص).');
+        if (asm.crackO && asm.crackA) ctx.next('تم تنظيف الصمامين. لو كانت هناك أتربة في المخرج لدخلت المنظم وأتلفته.');
+        else { ctx.asmMsg('good', isO ? 'تم تنظيف صمام الأكسجين. بقي صمام الأسيتيلين.' : 'تم تنظيف صمام الأسيتيلين. بقي صمام الأكسجين.'); refresh(); }
+      } else ctx.asmMsg('bad', 'المس صمام الأسطوانة نفسه (في الأعلى).');
       break;
     case 'regO': case 'regA': {
       const isO = s.id === 'regO', reg = isO ? regO : regA;
       if (!a.picked) {
-        if (id === s.id) { a.picked = true; ctx.asmMsg('info', 'تمام. دلوقتي المس الأسطوانة اللي هيتركب عليها.'); refresh(); }
-        else if (id === (isO ? 'regA' : 'regO')) ctx.asmMsg('bad', isO ? 'ده منظم الأسيتيلين (الأحمر). ابدأ بمنظم الأكسجين الأزرق.' : 'منظم الأكسجين اتركب خلاص. المس المنظم الأحمر.');
-        else ctx.asmMsg('bad', 'المس المنظم اللي على رف العربة الأول.');
+        if (id === s.id) { a.picked = true; ctx.asmMsg('info', 'جيد. الآن المس الأسطوانة التي سيُركّب عليها.'); refresh(); }
+        else if (id === (isO ? 'regA' : 'regO')) ctx.asmMsg('bad', isO ? 'هذا منظم الأسيتيلين (الأحمر). ابدأ بمنظم الأكسجين الأزرق.' : 'تم تركيب منظم الأكسجين. المس المنظم الأحمر.');
+        else ctx.asmMsg('bad', 'المس المنظم الموجود على رف العربة أولًا.');
         return;
       }
       if (id !== (isO ? 'cylO' : 'cylA') && id !== (isO ? 'valveO' : 'valveA')) {
-        if (id === 'cylA' || id === 'cylO' || id === 'valveA' || id === 'valveO') return ctx.asmMsg('bad', isO ? 'لأ! منظم الأكسجين سنّه يمين ومايركبش على الأسيتيلين؛ ولو اتركّب غلط يبقى خطر جداً.' : 'لأ! ده منظم أسيتيلين سنّه شمال، مكانه على أسطوانة الأسيتيلين (الحمرا).');
+        if (id === 'cylA' || id === 'cylO' || id === 'valveA' || id === 'valveO') return ctx.asmMsg('bad', isO ? 'لا! منظم الأكسجين ذو سن يمين ولا يُركّب على الأسيتيلين؛ وتركيبه خطأً خطير جدًا.' : 'لا! هذا منظم الأسيتيلين ذو السن الشمال، ومكانه على أسطوانة الأسيتيلين الحمراء.');
         return ctx.asmMsg('bad', 'المس الأسطوانة.');
       }
       a.picked = null; ctx.E.setHighlight([]);
       const cyl = isO ? cylO : cylA;
-      moveObj(ctx, reg, outletWorld(cyl), new THREE.Euler(0, 0, 0), 1.0, () => { asm[s.id] = true; ctx.audio.click(); ctx.next(isO ? 'منظم الأكسجين اتركّب واتربط بالمفتاح (من غير زيت أو شحم).' : 'منظم الأسيتيلين اتركّب. لاحظ الحزّة على الصامولة = سن شمال.'); });
+      moveObj(ctx, reg, outletWorld(cyl), new THREE.Euler(0, 0, 0), 1.0, () => { asm[s.id] = true; ctx.audio.click(); ctx.next(isO ? 'تم تركيب منظم الأكسجين وربطه بالمفتاح (بدون زيت أو شحم).' : 'تم تركيب منظم الأسيتيلين. لاحظ الحزّة على الصامولة = سن شمال.'); });
       break;
     }
     case 'arrest':
@@ -334,28 +334,28 @@ S.asmPick = (id, ctx) => {
         const k = id.endsWith('O') ? 'arrO' : 'arrA';
         if (asm[k]) return;
         asm[k] = true; placeArrestors(); updateHoses(); ctx.audio.click();
-        if (asm.arrO && asm.arrA) ctx.next('صمامات منع الارتداد اتركبت على المنظمين.');
-        else { ctx.asmMsg('good', 'اتركّب. فاضل المنظم التاني.'); refresh(); }
-      } else ctx.asmMsg('bad', 'المس المنظم عشان تركّب على مخرجه صمام منع الارتداد.');
+        if (asm.arrO && asm.arrA) ctx.next('تم تركيب صمامات منع الارتداد على المنظمين.');
+        else { ctx.asmMsg('good', 'تم التركيب. بقي المنظم الآخر.'); refresh(); }
+      } else ctx.asmMsg('bad', 'المس المنظم لتركّب على مخرجه صمام منع الارتداد.');
       break;
     case 'hoses':
       if (!a.picked) {
-        if (id === 'hoseO' || id === 'hoseA') { if (asm[id]) return ctx.asmMsg('info', 'الخرطوم ده متوصّل خلاص.'); a.picked = id; ctx.asmMsg('info', id === 'hoseO' ? 'مسكت الخرطوم الأزرق. المس المنظم بتاعه.' : 'مسكت الخرطوم الأحمر. المس المنظم بتاعه.'); refresh(); }
-        else ctx.asmMsg('bad', 'المس طرف خرطوم من اللي على الأرض.');
+        if (id === 'hoseO' || id === 'hoseA') { if (asm[id]) return ctx.asmMsg('info', 'هذا الخرطوم موصّل بالفعل.'); a.picked = id; ctx.asmMsg('info', id === 'hoseO' ? 'أمسكت الخرطوم الأزرق. المس المنظم الخاص به.' : 'أمسكت الخرطوم الأحمر. المس المنظم الخاص به.'); refresh(); }
+        else ctx.asmMsg('bad', 'المس طرف أحد الخراطيم الموجودة على الأرض.');
         return;
       }
-      if (id !== 'regO' && id !== 'regA' && id !== 'arrO' && id !== 'arrA') return ctx.asmMsg('bad', 'المس المنظم اللي هتوصّل عليه.');
+      if (id !== 'regO' && id !== 'regA' && id !== 'arrO' && id !== 'arrA') return ctx.asmMsg('bad', 'المس المنظم الذي ستوصّل به.');
       {
         const toO = id.endsWith('O');
-        if ((a.picked === 'hoseO') !== toO) return ctx.asmMsg('bad', a.picked === 'hoseO' ? 'الخرطوم الأزرق للأكسجين بس. ده منظم الأسيتيلين.' : 'الخرطوم الأحمر للأسيتيلين بس. ده منظم الأكسجين.');
+        if ((a.picked === 'hoseO') !== toO) return ctx.asmMsg('bad', a.picked === 'hoseO' ? 'الخرطوم الأزرق للأكسجين فقط. هذا منظم الأسيتيلين.' : 'الخرطوم الأحمر للأسيتيلين فقط. هذا منظم الأكسجين.');
         asm[a.picked] = true; a.picked = null; updateHoses(); ctx.audio.click();
-        if (asm.hoseO && asm.hoseA) ctx.next('الخراطيم اتوصّلت بالألوان الصح.');
-        else { ctx.asmMsg('good', 'اتوصّل. كمّل الخرطوم التاني.'); refresh(); }
+        if (asm.hoseO && asm.hoseA) ctx.next('تم توصيل الخراطيم بالألوان الصحيحة.');
+        else { ctx.asmMsg('good', 'تم التوصيل. أكمل الخرطوم الآخر.'); refresh(); }
       }
       break;
     case 'torchClosed':
-      if (id === 'torch') { asm.torchClosed = true; st.tA = st.tO = 0; ctx.next('صمامات البوري مقفولة. المعدة جاهزة؛ ننتقل للتشغيل والإشعال.'); }
-      else ctx.asmMsg('bad', 'المس البوري اللي على الطاولة.');
+      if (id === 'torch') { asm.torchClosed = true; st.tA = st.tO = 0; ctx.next('صمامات البوري مغلقة. المعدات جاهزة؛ ننتقل إلى التشغيل والإشعال.'); }
+      else ctx.asmMsg('bad', 'المس البوري الموجود على الطاولة.');
       break;
   }
 };
@@ -381,16 +381,16 @@ function pressOK(k) { const r = REC[st.task][k], v = k === 'O' ? st.pO : st.pA; 
 S.operateHTML = () => {
   const f = flameState(), ft = f ? flameType(f.ratio) : null, r = REC[st.task];
   const pct = (v, max) => (v / max) * 100;
-  const ppe = [['goggles', 'نظارة غاز عدسة ٥'], ['gloves', 'جوانتي جلد'], ['apron', 'مريلة جلد'], ['cotton', 'هدوم قطن مقفولة']];
+  const ppe = [['goggles', 'نظارة غاز بعدسة ٥'], ['gloves', 'قفاز جلدي'], ['apron', 'مريلة جلدية'], ['cotton', 'ملابس قطنية مغلقة']];
   const stepCls = ok => ok ? 'ok' : '';
   return `
-    <section class="card"><h3 class="sm">نوع الشغل</h3>
+    <section class="card"><h3 class="sm">نوع العمل</h3>
       <div class="seg2"><button type="button" class="${st.task === 'weld' ? 'on' : ''}" data-op="task:weld">لحام صاج ٢ مم</button><button type="button" class="${st.task === 'cut' ? 'on' : ''}" data-op="task:cut">قطع صلب ٦ مم</button></div></section>
     <section class="card"><h3 class="sm">١. افتح صمامات الأسطوانات</h3>
       <div class="seg2">
-        <button type="button" class="${st.valveO ? 'on' : ''}" data-op="valveO">${st.valveO ? ICON.check : ''} الأكسجين (للآخر)</button>
-        <button type="button" class="${st.valveA ? 'on' : ''}" data-op="valveA">${st.valveA ? ICON.check : ''} الأسيتيلين (½ لفة)</button>
-      </div><p class="muted small">افتح ببطء، وخلّي مسامير الضبط مفكوكة. عداد المحتوى هيعلى.</p></section>
+        <button type="button" class="${st.valveO ? 'on' : ''}" data-op="valveO">${st.valveO ? ICON.check : ''} الأكسجين (بالكامل)</button>
+        <button type="button" class="${st.valveA ? 'on' : ''}" data-op="valveA">${st.valveA ? ICON.check : ''} الأسيتيلين (نصف لفة)</button>
+      </div><p class="muted small">افتح ببطء، واترك مسامير الضبط مفكوكة. سيرتفع عداد المحتوى.</p></section>
     <section class="card"><h3 class="sm">٢. اضبط ضغط التشغيل</h3>
       <div class="lbl-row"><span>الأكسجين</span><b class="mono">${st.pO.toFixed(1)} bar</b></div>
       <input type="range" min="0" max="6" step="0.1" value="${st.pO}" data-op="pO" ${st.valveO ? '' : 'disabled'} aria-label="ضغط الأكسجين">
@@ -398,9 +398,9 @@ S.operateHTML = () => {
       <div class="lbl-row"><span>الأسيتيلين</span><b class="mono ${st.pA > 1 ? 'bad-t' : ''}">${st.pA.toFixed(2)} bar</b></div>
       <input type="range" min="0" max="1.5" step="0.05" value="${st.pA}" data-op="pA" ${st.valveA ? '' : 'disabled'} aria-label="ضغط الأسيتيلين">
       <div class="meter" dir="ltr"><div class="zone" style="left:${pct(r.A[0], 1.5)}%;width:${pct(r.A[1] - r.A[0], 1.5)}%"></div><div class="zone red" style="left:${pct(1, 1.5)}%;width:${pct(0.5, 1.5)}%"></div><div class="mark ${pressOK('A') ? 'ok' : st.pA > 1 ? 'high' : 'low'}" style="left:${pct(st.pA, 1.5)}%"></div></div>
-      <p class="muted small">المناسب لـ${st.task === 'cut' ? 'القطع' : 'اللحام'}: أكسجين ${r.O[0]}–${r.O[1]} بار، أسيتيلين ${r.A[0]}–${r.A[1]} بار. ${st.pA > 1 ? '<b class="bad-t">خطر: الأسيتيلين فوق ١ بار!</b>' : ''}</p></section>
+      <p class="muted small">المناسب لـ${st.task === 'cut' ? 'القطع' : 'اللحام'}: الأكسجين ${r.O[0]}–${r.O[1]} بار، والأسيتيلين ${r.A[0]}–${r.A[1]} بار. ${st.pA > 1 ? '<b class="bad-t">خطر: الأسيتيلين فوق ١ بار!</b>' : ''}</p></section>
     <section class="card"><h3 class="sm">٣. اختبار التسرب</h3>
-      <button type="button" class="btn ${st.leak ? 'on-green' : ''}" data-op="leak" ${st.pO && st.pA ? '' : 'disabled'}>${st.leak ? ICON.check + 'مافيش فقاقيع = مافيش تسريب' : 'رش مية بالصابون على الوصلات'}</button></section>
+      <button type="button" class="btn ${st.leak ? 'on-green' : ''}" data-op="leak" ${st.pO && st.pA ? '' : 'disabled'}>${st.leak ? ICON.check + 'لا توجد فقاعات = لا يوجد تسريب' : 'رُشّ ماءً وصابونًا على الوصلات'}</button></section>
     <section class="card"><h3 class="sm">٤. الإشعال وضبط اللهب</h3>
       <div class="seg3">
         <button type="button" class="${st.tA > 0 ? 'on' : ''}" data-op="openA">افتح أسيتيلين البوري</button>
@@ -413,8 +413,8 @@ S.operateHTML = () => {
       <div class="lbl-row"><span>صمام الأكسجين في البوري</span><b class="mono">${Math.round(st.tO * 100)}%</b></div>
       <input type="range" min="0" max="1.3" step="0.02" value="${st.tO}" data-op="tO" aria-label="صمام الأكسجين">
       <div class="flame-pick">${['carb', 'neutral', 'oxid'].map(k => `<span class="${ft === k ? 'on' : ''}">${{ carb: 'مكربن', neutral: 'متعادل', oxid: 'مؤكسد' }[k]}</span>`).join('')}</div>
-      <p class="small">${ft ? FLAME_NAMES[ft] + (ft === 'neutral' ? ': المخروط الداخلي واضح وحاد، ومافيش ريشة. ده المطلوب للصلب.' : ft === 'carb' ? ': في ريشة بيضا حوالين المخروط الداخلي. زوّد الأكسجين لحد ما الريشة تختفي.' : ': المخروط الداخلي قصير ومدبب وصوت اللهب عالي. قلّل الأكسجين.') : ''}</p>` : '<p class="muted small">الترتيب: أسيتيلين البوري ← ولّع ← أكسجين.</p>'}
-      ${st.lit ? `<button type="button" class="btn" data-op="off">${ICON.x}طفّي (أسيتيلين الأول ثم أكسجين)</button>` : ''}
+      <p class="small">${ft ? FLAME_NAMES[ft] + (ft === 'neutral' ? ': المخروط الداخلي واضح وحاد، ولا توجد ريشة. هذا هو المطلوب للصلب.' : ft === 'carb' ? ': توجد ريشة بيضاء حول المخروط الداخلي. زِد الأكسجين حتى تختفي الريشة.' : ': المخروط الداخلي قصير ومدبب وصوت اللهب عالٍ. قلّل الأكسجين.') : ''}</p>` : '<p class="muted small">الترتيب: أسيتيلين البوري ← الإشعال ← الأكسجين.</p>'}
+      ${st.lit ? `<button type="button" class="btn" data-op="off">${ICON.x}أطفئ (الأسيتيلين أولًا ثم الأكسجين)</button>` : ''}
     </section>
     <section class="card"><h3 class="sm">مهمات الوقاية</h3>
       <div class="ppe">${ppe.map(([k, n]) => `<button type="button" class="${st.ppe[k] ? 'on' : ''}" data-op="ppe:${k}">${st.ppe[k] ? ICON.check : ICON.shield}${n}</button>`).join('')}</div></section>`;
@@ -423,7 +423,7 @@ S.operateAction = (op, el, ctx) => {
   const say = (t, s) => ctx.toast(t, s);
   if (op.startsWith('range:')) {
     const k = op.slice(6), v = +el.value;
-    if (k === 'pO') st.pO = v; else if (k === 'pA') { st.pA = v; if (v > 1) say('bad', 'خطر! ضغط الأسيتيلين فوق ١ بار. ارجع بيه للمدى الآمن.'); }
+    if (k === 'pO') st.pO = v; else if (k === 'pA') { st.pA = v; if (v > 1) say('bad', 'خطر! ضغط الأسيتيلين فوق ١ بار. أرجعه إلى المدى الآمن.'); }
     else if (k === 'tA') st.tA = v; else if (k === 'tO') st.tO = v;
     updateGauges(); applyFlame(st.task === 'cut');
     clearTimeout(S._t); S._t = setTimeout(() => ctx.renderPanel(), 160); return;
@@ -431,15 +431,15 @@ S.operateAction = (op, el, ctx) => {
   if (op.startsWith('task:')) { setTask(op.slice(5)); S.enter(ctx); applyFlame(st.task === 'cut'); }
   else if (op === 'valveO') { st.valveO = st.valveO ? 0 : 1; if (!st.valveO) st.pO = 0; ctx.audio.sfx('hiss'); }
   else if (op === 'valveA') { st.valveA = st.valveA ? 0 : 1; if (!st.valveA) st.pA = 0; ctx.audio.sfx('hiss'); }
-  else if (op === 'leak') { st.leak = true; say('good', 'رشيت مية بالصابون على كل الوصلات. مافيش فقاقيع؛ الوصلات سليمة.'); }
-  else if (op === 'openA') { if (!(st.valveA && st.pA > 0)) say('bad', 'مافيش أسيتيلين واصل للبوري. افتح صمام الأسطوانة واضبط الضغط الأول.'); else { st.tA = 0.35; say('info', 'فتحت أسيتيلين البوري حوالي ربع لفة. ولّع فوراً بالولاعة.'); } }
+  else if (op === 'leak') { st.leak = true; say('good', 'رششت ماءً وصابونًا على جميع الوصلات. لا توجد فقاعات؛ الوصلات سليمة.'); }
+  else if (op === 'openA') { if (!(st.valveA && st.pA > 0)) say('bad', 'لا يصل أسيتيلين إلى البوري. افتح صمام الأسطوانة واضبط الضغط أولًا.'); else { st.tA = 0.35; say('info', 'فتحت أسيتيلين البوري حوالي ربع لفة. أشعل فورًا بالولاعة.'); } }
   else if (op === 'light') {
-    if (st.tO > 0 && !st.lit) say('bad', 'غلط وخطر! بنولّع الأسيتيلين لوحده الأول، مش والأكسجين مفتوح.');
-    else if (!(st.tA > 0)) say('bad', 'افتح أسيتيلين البوري الأول وبعدين ولّع.');
-    else { st.lit = true; ctx.audio.sfx('pop'); say('good', 'ولّعت! اللهب أصفر ودخّاني (أسيتيلين بس). زوّد الأكسجين بالتدريج.'); ctx.E.flyTo(V3(0.32, TABLE_Y + 0.32, 0.55), V3(0.15, TABLE_Y + 0.17, 0.2)); }
+    if (st.tO > 0 && !st.lit) say('bad', 'خطأ وخطر! نُشعل الأسيتيلين وحده أولًا، وليس والأكسجين مفتوح.');
+    else if (!(st.tA > 0)) say('bad', 'افتح أسيتيلين البوري أولًا، ثم أشعل.');
+    else { st.lit = true; ctx.audio.sfx('pop'); say('good', 'تم الإشعال! اللهب أصفر ودخاني (أسيتيلين فقط). زِد الأكسجين تدريجيًا.'); ctx.E.flyTo(V3(0.32, TABLE_Y + 0.32, 0.55), V3(0.15, TABLE_Y + 0.17, 0.2)); }
   }
-  else if (op === 'openO') { if (!st.lit) say('bad', 'ماينفعش تفتح أكسجين البوري قبل الإشعال.'); else if (!(st.valveO && st.pO > 0)) say('bad', 'مافيش أكسجين واصل. افتح صمام الأسطوانة واضبط الضغط.'); else { st.tO = Math.max(st.tO, 0.2); say('info', 'دلوقتي زوّد الأكسجين من الشريط لحد ما الريشة البيضا تختفي.'); } }
-  else if (op === 'off') { st.lit = false; st.tA = 0; st.tO = 0; say('info', 'اتطفى: قفلت الأسيتيلين الأول وبعدين الأكسجين.'); }
+  else if (op === 'openO') { if (!st.lit) say('bad', 'لا يصح فتح أكسجين البوري قبل الإشعال.'); else if (!(st.valveO && st.pO > 0)) say('bad', 'لا يصل أكسجين. افتح صمام الأسطوانة واضبط الضغط.'); else { st.tO = Math.max(st.tO, 0.2); say('info', 'الآن زِد الأكسجين من الشريط حتى تختفي الريشة البيضاء.'); } }
+  else if (op === 'off') { st.lit = false; st.tA = 0; st.tO = 0; say('info', 'تم الإطفاء: أغلقت الأسيتيلين أولًا، ثم الأكسجين.'); }
   else if (op.startsWith('ppe:')) { const k = op.slice(4); st.ppe[k] = !st.ppe[k]; ctx.audio.click(); }
   updateGauges(); applyFlame(st.task === 'cut'); ctx.renderPanel();
 };
@@ -449,10 +449,10 @@ S.operateReady = () => {
   if (!st.valveO || !st.valveA) return { ok: false, label: 'افتح صمامات الأسطوانات' };
   if (st.pA > 1) return { ok: false, label: 'ضغط الأسيتيلين خطر' };
   if (!pressOK('O') || !pressOK('A')) return { ok: false, label: 'اضبط ضغط التشغيل' };
-  if (!st.leak) return { ok: false, label: 'اعمل اختبار التسرب' };
-  if (!st.lit) return { ok: false, label: 'ولّع البوري' };
-  if (!ppe) return { ok: false, label: 'البس مهمات الوقاية' };
-  if (!neutral) return { ok: true, label: 'ابدأ (اللهب مش متعادل!)' };
+  if (!st.leak) return { ok: false, label: 'قم باختبار التسرب' };
+  if (!st.lit) return { ok: false, label: 'أشعل البوري' };
+  if (!ppe) return { ok: false, label: 'ارتدِ مهمات الوقاية' };
+  if (!neutral) return { ok: true, label: 'ابدأ (اللهب غير متعادل!)' };
   return { ok: true, label: st.task === 'cut' ? 'ابدأ القطع' : 'ابدأ اللحام' };
 };
 S.frame = (ctx, dt) => {
@@ -471,7 +471,7 @@ S.weldProc = ctx => {
   const set = S.weldSettings(), oxid = set.flame === 'oxid', carb = set.flame === 'carb';
   const common = {
     distName: 'بُعد المخروط', angleName: 'زاوية البوري', settingName: 'اللهب والضغط', angleShort: 'زاوية البوري',
-    stickBelow: 0.7, grace: 0.2, stickMsg: 'فرقعة! طرف البوري قرّب قوي من الحديد (ارتداد لهب). ابعد شوية وكمّل.',
+    stickBelow: 0.7, grace: 0.2, stickMsg: 'فرقعة! اقترب طرف البوري كثيرًا من الحديد (ارتداد اللهب). ابتعد قليلًا وأكمل.',
     lensShade: 'gas', lensExposure: 0.6, lensName: 'النظارة', distPerMM: 0.3, relDistPerPx: 0.03, sound: 'flame',
     lightColor: 0xbcd4ff, lightIntensity: 0.12, smoke: 1.5, settingScore: flameScore
   };
@@ -479,27 +479,27 @@ S.weldProc = ctx => {
     ...common, kind: 'cut',
     ideal: { angle: [80, 90], speed: [3, 6.5], dist: [2, 5] },
     heatNeed: 2.4, heatRate: s => 1.5 * THREE.MathUtils.clamp(1.4 - Math.abs(s.dist - 3.5) * 0.15, 0.3, 1.4),
-    aux: { label: 'أكسجين القطع', hint: 'اضغط بعد ما يحمر', icon: ICON.bolt },
+    aux: { label: 'أكسجين القطع', hint: 'اضغط بعد أن يحمرّ', icon: ICON.bolt },
     spacing: 0.0012, sparkDir: 'down',
     sparks: s => s.aux ? 420 : 8,
     poolMM: () => 4,
     dims: s => ({ w: 1.6 + Math.max(0, 2.5 - s.speed) * 0.5 + Math.max(0, s.dist - 5) * 0.2, h: 0, dross: s.speed < 2.6 ? 0.7 : 0.12 }),
     defects: c => {
       const out = [];
-      if (c.events.lost) out.push({ name: 'انقطاع القطع', en: 'Lost cut', cause: 'السرعة زادت فالحديد مالحقش يتسخن ' + c.AR(c.events.lost) + ' مرة.', fix: 'حافظ على سرعة ثابتة، ولو القطع وقف ارجع وسخّن تاني.' });
-      if (c.count('slow') || c.sim.dross.count > 30) out.push({ name: 'خبث ملتصق تحت القطع', en: 'Heavy dross', cause: 'الحركة بطيئة فالحديد المنصهر اتلحم تحت القطعة.', fix: 'زوّد السرعة شوية.' });
-      if (c.count('long')) out.push({ name: 'حواف علوية مدوّرة', en: 'Rounded top edge', cause: 'الفونية بعيدة عن الحديد.', fix: 'خلّي المخروط الداخلي على بُعد ٢–٥ مم.' });
-      if (c.events.early) out.push({ name: 'فتح الأكسجين بدري', en: 'Premature cutting oxygen', cause: 'فتحت أكسجين القطع قبل ما الحديد يحمر.', fix: 'سخّن لحد اللون الأحمر الفاتح وبعدين افتح.' });
+      if (c.events.lost) out.push({ name: 'انقطاع القطع', en: 'Lost cut', cause: 'زادت السرعة فلم يسخن الحديد بما يكفي ' + c.AR(c.events.lost) + ' مرة.', fix: 'حافظ على سرعة ثابتة، وإذا توقف القطع ارجع وسخّن مرة أخرى.' });
+      if (c.count('slow') || c.sim.dross.count > 30) out.push({ name: 'خبث ملتصق تحت القطع', en: 'Heavy dross', cause: 'الحركة بطيئة، فالتحم الحديد المنصهر أسفل القطعة.', fix: 'زِد السرعة قليلًا.' });
+      if (c.count('long')) out.push({ name: 'حواف علوية مدوّرة', en: 'Rounded top edge', cause: 'الفونية بعيدة عن الحديد.', fix: 'اجعل المخروط الداخلي على بُعد ٢–٥ مم.' });
+      if (c.events.early) out.push({ name: 'فتح الأكسجين مبكرًا', en: 'Premature cutting oxygen', cause: 'فتحت أكسجين القطع قبل أن يحمرّ الحديد.', fix: 'سخّن حتى اللون الأحمر الفاتح، ثم افتح.' });
       if (set.flame !== 'neutral') out.push({ name: 'لهب تسخين غير متعادل', en: 'Wrong preheat flame', cause: FLAME_NAMES[set.flame] + '.', fix: 'اضبط لهب التسخين على متعادل.' });
       return out;
     },
-    hint: 'حط البوري على أول الخط الأبيض واستنى لما الحديد يحمر، وبعدين اضغط «أكسجين القطع» وانت ماشي على الخط.'
+    hint: 'ضع البوري على بداية الخط الأبيض وانتظر حتى يحمرّ الحديد، ثم اضغط «أكسجين القطع» وتحرك على الخط.'
   };
   return {
     ...common, kind: 'flame',
     ideal: { angle: [35, 55], speed: [1.0, 2.4], dist: [2, 4] },
     heatNeed: 1.5, heatRate: s => 1.25 * THREE.MathUtils.clamp(1.35 - Math.abs(s.dist - 3) * 0.18, 0.25, 1.35) * (carb ? 0.85 : 1),
-    fillerLen: 0.45, aux: { label: 'سلك الإضافة', hint: 'اغمس واطلع', icon: ICON.plus },
+    fillerLen: 0.45, aux: { label: 'سلك الإضافة', hint: 'اغمس وارفع', icon: ICON.plus },
     spacing: 0.0011,
     sparks: () => oxid ? 45 : 4,
     poolMM: s => 5 + (s.heat > 2.5 ? 1.5 : 0),
@@ -513,15 +513,15 @@ S.weldProc = ctx => {
     penetration: () => 1,
     defects: c => {
       const out = [];
-      if (c.count('nofill')) out.push({ name: 'نقص امتلاء (خط مقعر)', en: 'Underfill', cause: 'ماضفتش سلك كفاية في ' + c.AR(c.count('nofill')) + ' منطقة.', fix: 'اغمس سلك الإضافة في البركة بانتظام كل ما تتقدم.' });
-      if (c.count('fast')) out.push({ name: 'عدم انصهار كامل', en: 'Lack of fusion', cause: 'اتقدمت قبل ما البركة تتكون كويس.', fix: 'استنى البركة اللامعة تتكون وبعدين اتحرك.' });
-      if (c.count('slow')) out.push({ name: 'سيحان وثقوب', en: 'Burn-through', cause: 'الحرارة اتركزت في مكان واحد على صاج رفيع.', fix: 'زوّد السرعة شوية أو ارفع البوري.' });
-      if (oxid) out.push({ name: 'أكسدة واحتراق المعدن', en: 'Oxidized weld', cause: 'اللهب مؤكسد (زيادة أكسجين).', fix: 'قلّل أكسجين البوري لحد ما اللهب يبقى متعادل.' });
-      if (carb) out.push({ name: 'تكربن الخط (هش)', en: 'Carburized weld', cause: 'اللهب مكربن (زيادة أسيتيلين).', fix: 'زوّد الأكسجين لحد ما الريشة تختفي.' });
+      if (c.count('nofill')) out.push({ name: 'نقص امتلاء (خط مقعر)', en: 'Underfill', cause: 'لم تُضف سلكًا كافيًا في ' + c.AR(c.count('nofill')) + ' منطقة.', fix: 'اغمس سلك الإضافة في البركة بانتظام كلما تقدمت.' });
+      if (c.count('fast')) out.push({ name: 'عدم انصهار كامل', en: 'Lack of fusion', cause: 'تقدمت قبل أن تتكوّن البركة جيدًا.', fix: 'انتظر حتى تتكوّن البركة اللامعة، ثم تحرّك.' });
+      if (c.count('slow')) out.push({ name: 'انصهار وثقوب', en: 'Burn-through', cause: 'تركّزت الحرارة في مكان واحد على صاج رقيق.', fix: 'زِد السرعة قليلًا أو ارفع البوري.' });
+      if (oxid) out.push({ name: 'أكسدة واحتراق المعدن', en: 'Oxidized weld', cause: 'اللهب مؤكسد (أكسجين زائد).', fix: 'قلّل أكسجين البوري حتى يصبح اللهب متعادلًا.' });
+      if (carb) out.push({ name: 'تكربُن الخط (هش)', en: 'Carburized weld', cause: 'اللهب مكربن (أسيتيلين زائد).', fix: 'زِد الأكسجين حتى تختفي الريشة.' });
       if (c.events.stuck) out.push({ name: 'ارتداد لهب (فرقعة)', en: 'Backfire', cause: 'طرف الفونية لمس البركة ' + c.AR(c.events.stuck) + ' مرة.', fix: 'حافظ على المخروط الداخلي ٢–٤ مم فوق البركة.' });
       return out;
     },
-    hint: 'وجّه اللهب على أول الوصلة واستنى البركة تلمع، وبعدين اتحرك ببطء واغمس سلك الإضافة بالزرار.'
+    hint: 'وجّه اللهب على بداية الوصلة وانتظر حتى تلمع البركة، ثم تحرّك ببطء واغمس سلك الإضافة بالزر.'
   };
 };
 S.hud = ctx => {
@@ -535,13 +535,13 @@ S.hud = ctx => {
 };
 S.coach = (ctx, o) => {
   const p = ctx.sim.proc, w = ctx.state.weld;
-  if (o.preheat != null && o.preheat < 1) return p.kind === 'cut' ? 'سخّن… استنى الحديد يحمر' : 'استنى البركة اللامعة تتكون';
-  if (p.kind === 'cut' && !w.aux && o.heat >= 1) return 'الحديد احمر! اضغط أكسجين القطع واتحرك';
-  if (o.speed > p.ideal.speed[1] * 1.2) return 'سرعتك عالية، بطّأ';
-  if (o.speed < p.ideal.speed[0] * 0.6 && ctx.sim.time > 3) return 'اتحرك شوية';
+  if (o.preheat != null && o.preheat < 1) return p.kind === 'cut' ? 'سخّن… انتظر حتى يحمرّ الحديد' : 'انتظر حتى تتكوّن البركة اللامعة';
+  if (p.kind === 'cut' && !w.aux && o.heat >= 1) return 'احمرّ الحديد! اضغط أكسجين القطع وتحرّك';
+  if (o.speed > p.ideal.speed[1] * 1.2) return 'سرعتك عالية، أبطئ';
+  if (o.speed < p.ideal.speed[0] * 0.6 && ctx.sim.time > 3) return 'تحرّك قليلًا';
   if (w.eff > p.ideal.dist[1] + 0.6) return 'البوري بعيد، قرّب';
-  if (w.eff < p.ideal.dist[0] - 0.4) return 'البوري قريب قوي، ارفعه';
-  if (p.kind === 'flame' && ctx.sim.time > 4 && !w.aux && Math.random() < 0.02) return 'متنساش تغمس سلك الإضافة';
+  if (w.eff < p.ideal.dist[0] - 0.4) return 'البوري قريب جدًا، ارفعه';
+  if (p.kind === 'flame' && ctx.sim.time > 4 && !w.aux && Math.random() < 0.02) return 'لا تنسَ غمس سلك الإضافة';
   return null;
 };
 let tick = 0;

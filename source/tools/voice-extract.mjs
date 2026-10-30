@@ -17,7 +17,7 @@ for (const f of files) {
   });
 }
 // dynamic phrases
-for (let i = 0; i <= 100; i++) { raw.add('درجتك ' + i + ' من مية.'); raw.add(String(i)); }
+for (let i = 0; i <= 100; i++) { raw.add('درجتك ' + i + ' من مئة.'); raw.add(String(i)); }
 for (let i = 1; i <= 15; i++) raw.add('الخطوة ' + i + ':');
 const extra = JSON.parse(existsSync('tools/voice-extra.json') ? readFileSync('tools/voice-extra.json', 'utf8') : '[]');
 extra.forEach(t => raw.add(t));

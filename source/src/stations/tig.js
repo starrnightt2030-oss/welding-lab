@@ -8,34 +8,34 @@ import { ICON } from '../core/icons.js';
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const S = {
   id: 'tig', name: 'التنجستن والغاز الخامل', code: 'TIG / GTAW', icon: ICON.tig, ready: true,
-  stages: [['explore', 'اتعرّف'], ['assemble', 'ركّب'], ['operate', 'شغّل'], ['weld', 'الحم'], ['inspect', 'افحص']]
+  stages: [['explore', 'تعرّف'], ['assemble', 'ركّب'], ['operate', 'شغّل'], ['weld', 'الحم'], ['inspect', 'افحص']]
 };
 S.parts = [
   { id: 'machine', name: 'ماكينة TIG (إنفرتر AC/DC)', en: 'TIG inverter power source', far: 0.9,
-    desc: 'ماكينة تيار ثابت بتطلع تيار مستمر للصلب والاستانلس، أو متردد للألومنيوم. فيها إشعال بالتردد العالي (HF) يولّع القوس من غير ما التنجستن يلمس الشغلانة.',
-    facts: ['زرار 2T/4T بيحدد طريقة الضغط على زرار التورش.', 'زمن الغاز بعد اللحام (Post-flow) بيحمي التنجستن والخط وهما بيبردوا.'], safety: 'التردد العالي ممكن يأثر على الأجهزة الطبية زي منظم ضربات القلب.' },
-  { id: 'display', name: 'الشاشة ومنظّم التيار', en: 'Display & current knob', far: 0.42,
-    desc: 'بتضبط شدة التيار. قاعدة تقريبية للصلب: حوالي ٣٥–٤٠ أمبير لكل ١ مم سُمك.', facts: [], safety: '' },
+    desc: 'ماكينة تيار ثابت تُخرج تيارًا مستمرًا للصلب والصلب الذي لا يصدأ، أو مترددًا للألومنيوم. فيها إشعال بالتردد العالي (HF) يُشعل القوس دون أن يلمس التنجستن قطعة العمل.',
+    facts: ['مفتاح 2T/4T يحدد طريقة الضغط على زر التورش.', 'زمن الغاز بعد اللحام (Post-flow) يحمي التنجستن والخط أثناء التبريد.'], safety: 'قد يؤثر التردد العالي على الأجهزة الطبية مثل منظم ضربات القلب.' },
+  { id: 'display', name: 'الشاشة ومنظم التيار', en: 'Display & current knob', far: 0.42,
+    desc: 'تضبط شدة التيار. قاعدة تقريبية للصلب: حوالي ٣٥–٤٠ أمبير لكل ١ مم من السُمك.', facts: [], safety: '' },
   { id: 'sockets', name: 'أطراف التوصيل', en: 'Output terminals', far: 0.45,
-    desc: 'في لحام TIG للصلب التورش بيتوصل على السالب (DCEN) والأرضي على الموجب.',
-    facts: ['DCEN: حوالي ٧٠٪ من الحرارة في الشغلانة و٣٠٪ في التنجستن، فالتنجستن مايسيحش.'], safety: 'لو وصّلت التورش على الموجب، التنجستن هيسخن جداً ويسيح في البركة.' },
+    desc: 'في لحام TIG للصلب يُوصّل التورش بالسالب (DCEN) والأرضي بالموجب.',
+    facts: ['DCEN: حوالي ٧٠٪ من الحرارة في قطعة العمل و٣٠٪ في التنجستن، فلا ينصهر التنجستن.'], safety: 'إذا وصّلت التورش بالموجب سيسخن التنجستن جدًا وينصهر في البركة.' },
   { id: 'cylinder', name: 'أسطوانة الأرجون', en: 'Argon cylinder', far: 1.0,
-    desc: 'الأرجون غاز خامل؛ مابيتفاعلش مع المعدن المنصهر، فبيحمي البركة والتنجستن من الهوا.',
-    facts: ['لونها رمادي بكتف أخضر غامق (حسب المواصفة).'], safety: 'الأرجون أتقل من الهوا وممكن يطرد الأكسجين في الأماكن المقفولة؛ اشتغل في مكان متهوّي.' },
-  { id: 'flow', name: 'منظم الأرجون بالعدّاد الزجاجي', en: 'Regulator / flowmeter', far: 0.4,
-    desc: 'عداد بيبيّن ضغط الأسطوانة، وأنبوبة زجاج فيها كورة بتقيس التصرف باللتر/دقيقة.', facts: ['التصرف المناسب غالباً ٧–١٢ لتر/دقيقة.'], safety: '' },
+    desc: 'الأرجون غاز خامل؛ لا يتفاعل مع المعدن المنصهر، فيحمي البركة والتنجستن من الهواء.',
+    facts: ['لونها رمادي بكتف أخضر غامق (حسب المواصفة).'], safety: 'الأرجون أثقل من الهواء وقد يطرد الأكسجين في الأماكن المغلقة؛ اعمل في مكان جيد التهوية.' },
+  { id: 'flow', name: 'منظم الأرجون بالعداد الزجاجي', en: 'Regulator / flowmeter', far: 0.4,
+    desc: 'عداد يبيّن ضغط الأسطوانة، وأنبوبة زجاجية بها كرة تقيس التصرف باللتر في الدقيقة.', facts: ['التصرف المناسب غالبًا ٧–١٢ لترًا في الدقيقة.'], safety: '' },
   { id: 'torch', name: 'تورش TIG', en: 'TIG torch', far: 0.35, view: V3(0.3, 0.5, 1),
-    desc: 'فيه الكوليت اللي بيمسك التنجستن، والفوهة السيراميك اللي بتوجّه الغاز، والغطا الخلفي، وزرار التشغيل.',
-    facts: ['مقاس الفوهة (رقم ٥–٨) بيتحدد حسب التيار ونوع الوصلة.'], safety: 'رأس التورش بتسخن جداً؛ ماتمسكهاش بعد اللحام.' },
+    desc: 'فيه الكوليت الذي يمسك التنجستن، والفوهة السيراميكية التي توجّه الغاز، والغطاء الخلفي، وزر التشغيل.',
+    facts: ['يُحدد مقاس الفوهة (رقم ٥–٨) حسب التيار ونوع الوصلة.'], safety: 'رأس التورش تسخن جدًا؛ لا تمسكها بعد اللحام.' },
   { id: 'tungsten', name: 'قطب التنجستن', en: 'Tungsten electrode', far: 0.25, view: V3(0.3, 0.5, 1),
-    desc: 'قطب غير مستهلك (مابيدوبش)، بيتبرى سن قلم للتيار المستمر، وبيطلع من الفوهة ٣–٥ مم.',
-    facts: ['اللون على طرفه بيبيّن نوعه: أحمر (ثوريوم ٢٪)، رمادي (سيريوم)، ذهبي (لانثانم)، أخضر (نقي للألومنيوم AC).', 'البرد يكون طولي في اتجاه السن، مش لف.'], safety: 'لو التنجستن لمس البركة اتلوّث ولازم يتبرى تاني.' },
+    desc: 'قطب غير مستهلك (لا ينصهر)، يُبرى مثل سن القلم للتيار المستمر، ويبرز من الفوهة ٣–٥ مم.',
+    facts: ['اللون على طرفه يبيّن نوعه: أحمر (ثوريوم ٢٪)، ورمادي (سيريوم)، وذهبي (لانثانم)، وأخضر (نقي للألومنيوم AC).', 'يكون البرد طوليًا في اتجاه السن، وليس دائريًا.'], safety: 'إذا لمس التنجستن البركة تلوّث ويجب بريه مرة أخرى.' },
   { id: 'rods', name: 'أسلاك الإضافة', en: 'Filler rods (ER70S-6)', far: 0.4,
-    desc: 'أسلاك بتتمسك باليد التانية وبتتغمس في طرف البركة الأمامي.', facts: ['اليد التانية بتغمس السلك والتورش ثابت؛ ماتلمسش التنجستن بالسلك.'], safety: '' },
+    desc: 'أسلاك تُمسك باليد الأخرى وتُغمس في الطرف الأمامي للبركة.', facts: ['اليد الأخرى تغمس السلك والتورش ثابت؛ لا تلمس التنجستن بالسلك.'], safety: '' },
   { id: 'pedal', name: 'دواسة القدم', en: 'Foot pedal', far: 0.5,
-    desc: 'بتتحكم في التيار وانت شغال: تدوس أكتر = تيار أعلى، وتشيل رجلك تدريجياً في آخر الخط عشان مايحصلش شرخ في النهاية.', facts: [], safety: '' },
-  { id: 'clamp', name: 'ماسك الأرضي', en: 'Work clamp', far: 0.4, desc: 'بيقفل الدائرة من الشغلانة للماكينة.', facts: [], safety: 'لازم يكون على سطح نضيف من الصدأ والدهان.' },
-  { id: 'plates', name: 'قطع الشغل', en: 'Workpieces 3 mm', far: 0.4, desc: 'صاج صلب ٣ مم، وصلة تناكبية. في TIG النضافة أهم من أي طريقة تانية: لازم المعدن يتنضّف بالفرشاة والمذيب.', facts: [], safety: '' }
+    desc: 'تتحكم في التيار أثناء العمل: كلما ضغطت أكثر = زاد التيار، وارفع قدمك تدريجيًا في نهاية الخط حتى لا يحدث شرخ في النهاية.', facts: [], safety: '' },
+  { id: 'clamp', name: 'ماسك الأرضي', en: 'Work clamp', far: 0.4, desc: 'يُغلق الدائرة من قطعة العمل إلى الماكينة.', facts: [], safety: 'يجب أن يكون على سطح نظيف من الصدأ والطلاء.' },
+  { id: 'plates', name: 'قطع العمل', en: 'Workpieces 3 mm', far: 0.4, desc: 'صاج صلب ٣ مم، وصلة تناكبية. في TIG النظافة أهم من أي طريقة أخرى: يجب تنظيف المعدن بالفرشاة والمذيب.', facts: [], safety: '' }
 ];
 
 let ctxRef, m, cyl, flow, torch, tung, clamp, plugT, plugG, cableT, cableG, gasHose, pedal, pedalCable, rods, rod, tbox;
@@ -180,14 +180,14 @@ S.cams = {
 
 // assemble
 S.asmSteps = [
-  { id: 'power', title: 'اطفي الماكينة', hint: 'المس مفتاح التشغيل الأحمر.' },
-  { id: 'plugT', title: 'وصّل كابل التورش بالطرف السالب (−)', hint: 'المس فيشة التورش اللي على الأرض، وبعدين الطرف المناسب.' },
-  { id: 'plugG', title: 'وصّل كابل الأرضي بالطرف الموجب (+)', hint: 'المس فيشة الأرضي، وبعدين الطرف الفاضي.' },
-  { id: 'clamp', title: 'ثبّت ماسك الأرضي على الطاولة', hint: 'المس ماسك الأرضي اللي على الأرض.' },
+  { id: 'power', title: 'أطفئ الماكينة', hint: 'المس مفتاح التشغيل الأحمر.' },
+  { id: 'plugT', title: 'وصّل كابل التورش بالطرف السالب (−)', hint: 'المس قابس التورش الموجود على الأرض، ثم الطرف المناسب.' },
+  { id: 'plugG', title: 'وصّل كابل الأرضي بالطرف الموجب (+)', hint: 'المس قابس الأرضي، ثم الطرف الفارغ.' },
+  { id: 'clamp', title: 'ثبّت ماسك الأرضي على الطاولة', hint: 'المس ماسك الأرضي الموجود على الأرض.' },
   { id: 'flow', title: 'نضّف صمام الأرجون وركّب العداد', hint: 'المس أسطوانة الأرجون.' },
   { id: 'hose', title: 'وصّل خرطوم الغاز من العداد للماكينة', hint: 'المس عداد الأرجون.' },
-  { id: 'tung', title: 'ركّب التنجستن (أحمر ٢٪، مبري سن قلم) وطلّعه ٤ مم', hint: 'المس علبة التنجستن.' },
-  { id: 'pedal', title: 'وصّل دواسة القدم', hint: 'المس الدواسة اللي على الأرض.' }
+  { id: 'tung', title: 'ركّب التنجستن (أحمر ٢٪، مبري مثل سن القلم) وأخرجه ٤ مم', hint: 'المس علبة التنجستن.' },
+  { id: 'pedal', title: 'وصّل دواسة القدم', hint: 'المس الدواسة الموجودة على الأرض.' }
 ];
 S.asmStart = () => { setPower(true); };
 S.asmTargets = (step, ctx) => {
@@ -202,25 +202,25 @@ function moveObj(ctx, obj, toP, toR, dur, done0) {
 }
 S.asmPick = (id, ctx, r) => {
   const a = ctx.state.asm, s = S.asmSteps[a.step]; if (!s) return;
-  if (st.power && s.id !== 'power' && id !== 'switch' && ['plugT', 'plugG'].includes(s.id)) return ctx.asmMsg('bad', 'اطفي الماكينة الأول قبل توصيل الكابلات.');
+  if (st.power && s.id !== 'power' && id !== 'switch' && ['plugT', 'plugG'].includes(s.id)) return ctx.asmMsg('bad', 'أطفئ الماكينة أولًا قبل توصيل الكابلات.');
   switch (s.id) {
-    case 'power': if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة مطفية.'); } else ctx.asmMsg('bad', 'أول خطوة: اطفي الماكينة.'); break;
+    case 'power': if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة مطفأة.'); } else ctx.asmMsg('bad', 'الخطوة الأولى: أطفئ الماكينة.'); break;
     case 'plugT': case 'plugG': {
       const isT = s.id === 'plugT', plug = isT ? plugT : plugG;
-      if (!a.picked) { if (id === s.id) { a.picked = true; ctx.asmMsg('info', 'المس الطرف اللي هتوصّل فيه.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', isT ? 'المس فيشة كابل التورش الأول.' : 'المس فيشة كابل الأرضي.'); return; }
+      if (!a.picked) { if (id === s.id) { a.picked = true; ctx.asmMsg('info', 'المس الطرف الذي ستوصّل به.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', isT ? 'المس قابس كابل التورش أولًا.' : 'المس قابس كابل الأرضي.'); return; }
       if (id !== 'sockets') return ctx.asmMsg('bad', 'المس طرف توصيل في الماكينة.');
       const which = r && r.object === m.sockets.plus ? 'plus' : 'minus';
-      if (isT && which === 'plus') return ctx.asmMsg('bad', 'لأ! في TIG للصلب التورش على السالب (DCEN). لو على الموجب التنجستن هيسخن ويسيح.');
-      if (!isT && which === 'minus') return ctx.asmMsg('bad', 'الطرف السالب عليه التورش. الأرضي على الموجب.');
+      if (isT && which === 'plus') return ctx.asmMsg('bad', 'لا! في TIG للصلب يكون التورش على السالب (DCEN). إذا كان على الموجب سيسخن التنجستن وينصهر.');
+      if (!isT && which === 'minus') return ctx.asmMsg('bad', 'التورش على السالب، والأرضي على الموجب.');
       a.picked = null; ctx.E.setHighlight([]);
-      moveObj(ctx, plug, sockW(which), new THREE.Euler(0, 0, 0), 1, () => { asm[s.id] = true; ctx.audio.sfx('clunk'); ctx.next(isT ? 'التورش على السالب = DCEN. ٧٠٪ من الحرارة في الشغلانة.' : 'الأرضي على الموجب.'); });
+      moveObj(ctx, plug, sockW(which), new THREE.Euler(0, 0, 0), 1, () => { asm[s.id] = true; ctx.audio.sfx('clunk'); ctx.next(isT ? 'التورش على السالب = DCEN. ٧٠٪ من الحرارة في قطعة العمل.' : 'الأرضي على الموجب.'); });
       break;
     }
-    case 'clamp': if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1, () => { asm.clamp = true; updateCables(); ctx.next('ماسك الأرضي متثبّت.'); }); } else ctx.asmMsg('bad', 'المس ماسك الأرضي.'); break;
-    case 'flow': if (id === 'cylinder' || id === 'flow') { ctx.E.setHighlight([]); moveObj(ctx, flow, outletW(cyl), new THREE.Euler(0, 0, 0), 1, () => { asm.flow = true; updateMachine(); ctx.next('نضّفت الصمام وركّبت العداد. عداد المحتوى بيقرا ضغط الأسطوانة.'); }); } else ctx.asmMsg('bad', 'المس أسطوانة الأرجون.'); break;
-    case 'hose': if (id === 'flow') { asm.hose = true; updateCables(); ctx.audio.sfx('clunk'); ctx.next('خرطوم الغاز اتوصّل لمدخل الغاز في ضهر الماكينة.'); } else ctx.asmMsg('bad', 'المس عداد الأرجون.'); break;
-    case 'tung': if (id === 'tbox') { tung.visible = true; asm.tung = true; ctx.next('اخترت التنجستن الأحمر (٢٪ ثوريوم) للتيار المستمر، مبري سن قلم، وطالع ٤ مم من الفوهة.'); ctx.E.flyTo(V3(0.75, TABLE_Y + 0.12, 0.38), anc(torch, torch.userData.tipL)); } else ctx.asmMsg('bad', 'المس علبة التنجستن.'); break;
-    case 'pedal': if (id === 'pedal' || id === 'ctrl') { asm.pedal = true; updateCables(); ctx.next('الدواسة اتوصّلت. المعدة جاهزة.'); } else ctx.asmMsg('bad', 'المس دواسة القدم.'); break;
+    case 'clamp': if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1, () => { asm.clamp = true; updateCables(); ctx.next('تم تثبيت ماسك الأرضي.'); }); } else ctx.asmMsg('bad', 'المس ماسك الأرضي.'); break;
+    case 'flow': if (id === 'cylinder' || id === 'flow') { ctx.E.setHighlight([]); moveObj(ctx, flow, outletW(cyl), new THREE.Euler(0, 0, 0), 1, () => { asm.flow = true; updateMachine(); ctx.next('نظّفت الصمام وركّبت العداد. عداد المحتوى يقرأ ضغط الأسطوانة.'); }); } else ctx.asmMsg('bad', 'المس أسطوانة الأرجون.'); break;
+    case 'hose': if (id === 'flow') { asm.hose = true; updateCables(); ctx.audio.sfx('clunk'); ctx.next('تم توصيل خرطوم الغاز بمدخل الغاز في ظهر الماكينة.'); } else ctx.asmMsg('bad', 'المس عداد الأرجون.'); break;
+    case 'tung': if (id === 'tbox') { tung.visible = true; asm.tung = true; ctx.next('اخترت التنجستن الأحمر (ثوريوم ٢٪) للتيار المستمر، مبريًا مثل سن القلم، وبارزًا ٤ مم من الفوهة.'); ctx.E.flyTo(V3(0.75, TABLE_Y + 0.12, 0.38), anc(torch, torch.userData.tipL)); } else ctx.asmMsg('bad', 'المس علبة التنجستن.'); break;
+    case 'pedal': if (id === 'pedal' || id === 'ctrl') { asm.pedal = true; updateCables(); ctx.next('تم توصيل الدواسة. المعدات جاهزة.'); } else ctx.asmMsg('bad', 'المس دواسة القدم.'); break;
   }
 };
 S.asmAuto = ctx => {
@@ -237,22 +237,22 @@ const pen = (v, [a, b], k) => v < a ? (a - v) * k : v > b ? (v - b) * k : 0;
 S.operateHTML = () => {
   const r = RANGE[st.material], c = st.current, pct = (v, lo, hi) => ((v - lo) / (hi - lo)) * 100;
   const okMode = (st.material === 'steel') === (st.mode === 'DC');
-  const ppe = [['helmet', 'ماسك عدسة ١٠–١١'], ['gloves', 'جوانتي TIG رفيع'], ['jacket', 'جاكيت لحام'], ['clean', 'نضّفت المعدن']];
+  const ppe = [['helmet', 'قناع بعدسة ١٠–١١'], ['gloves', 'قفاز TIG رقيق'], ['jacket', 'سترة لحام'], ['clean', 'نظّفت المعدن']];
   return `
     <section class="card"><h3 class="sm">المعدن</h3><div class="seg2"><button type="button" class="${st.material === 'steel' ? 'on' : ''}" data-op="mat:steel">صلب ٣ مم</button><button type="button" class="${st.material === 'alu' ? 'on' : ''}" data-op="mat:alu">ألومنيوم ٣ مم</button></div></section>
     <section class="card"><div class="ph"><h3 class="sm">نوع التيار</h3><span class="tag ${okMode ? 'ok' : 'high'}">${okMode ? 'مناسب' : 'غير مناسب'}</span></div>
       <div class="seg2"><button type="button" class="${st.mode === 'DC' ? 'on' : ''}" data-op="mode:DC">DC− مستمر</button><button type="button" class="${st.mode === 'AC' ? 'on' : ''}" data-op="mode:AC">AC متردد</button></div>
-      <p class="muted small">الصلب والاستانلس: تيار مستمر والتورش سالب. الألومنيوم: تيار متردد عشان يكسّر طبقة الأكسيد (ومعاه تنجستن أخضر أو زيركونيوم).</p></section>
+      <p class="muted small">الصلب والصلب الذي لا يصدأ: تيار مستمر والتورش على السالب. الألومنيوم: تيار متردد لتكسير طبقة الأكسيد (ومعه تنجستن أخضر أو زركونيوم).</p></section>
     <section class="card"><div class="ph"><h3 class="sm">شدة التيار</h3><span class="tag ${c >= r[0] && c <= r[1] ? 'ok' : c < r[0] ? 'low' : 'high'}">${r[0]}–${r[1]} A</span></div>
-      <div class="cur-ctl"><button type="button" class="round" data-op="cur-" aria-label="قلّل">${ICON.minus}</button><div class="cur-val"><span class="mono">${c}</span><small class="mono">A</small></div><button type="button" class="round acc" data-op="cur+" aria-label="زوّد">${ICON.plus}</button></div>
+      <div class="cur-ctl"><button type="button" class="round" data-op="cur-" aria-label="قلّل">${ICON.minus}</button><div class="cur-val"><span class="mono">${c}</span><small class="mono">A</small></div><button type="button" class="round acc" data-op="cur+" aria-label="زِد">${ICON.plus}</button></div>
       <input type="range" min="10" max="200" step="5" value="${c}" data-op="current" aria-label="التيار"></section>
     <section class="card"><div class="ph"><h3 class="sm">تصرّف الأرجون</h3><span class="tag ${st.flowR >= 7 && st.flowR <= 12 ? 'ok' : 'low'}">${st.flowR} L/min</span></div>
       <input type="range" min="0" max="25" step="1" value="${st.flowR}" data-op="flowR" aria-label="تصرف الغاز">
-      <p class="muted small">المناسب ٧–١٢ لتر/دقيقة. القليل مش هيحمي البركة، والكتير بيعمل دوامات تسحب هوا.</p>
+      <p class="muted small">المناسب ٧–١٢ لترًا في الدقيقة. القليل لن يحمي البركة، والكثير يسبب دوامات تسحب الهواء.</p>
       <div class="lbl-row"><span>غاز بعد اللحام (Post-flow)</span><b class="mono">${st.post} s</b></div>
       <input type="range" min="0" max="15" step="1" value="${st.post}" data-op="post" aria-label="زمن الغاز بعد اللحام"></section>
-    <section class="card"><h3 class="sm">قبل ما تبدأ</h3><div class="ppe">${ppe.map(([k, n]) => `<button type="button" class="${st.ppe[k] ? 'on' : ''}" data-op="ppe:${k}">${st.ppe[k] ? ICON.check : ICON.shield}${n}</button>`).join('')}</div></section>
-    <button type="button" class="btn ${st.power ? 'on-green' : ''}" data-op="power">${ICON.bolt}${st.power ? 'الماكينة شغالة' : 'شغّل الماكينة'}</button>`;
+    <section class="card"><h3 class="sm">قبل أن تبدأ</h3><div class="ppe">${ppe.map(([k, n]) => `<button type="button" class="${st.ppe[k] ? 'on' : ''}" data-op="ppe:${k}">${st.ppe[k] ? ICON.check : ICON.shield}${n}</button>`).join('')}</div></section>
+    <button type="button" class="btn ${st.power ? 'on-green' : ''}" data-op="power">${ICON.bolt}${st.power ? 'الماكينة تعمل' : 'شغّل الماكينة'}</button>`;
 };
 S.operateAction = (op, el, ctx) => {
   if (op.startsWith('range:')) { const k = op.slice(6); st[k === 'current' ? 'current' : k] = +el.value; updateMachine(); clearTimeout(S._t); S._t = setTimeout(() => ctx.renderPanel(), 150); return; }
@@ -266,10 +266,10 @@ S.operateAction = (op, el, ctx) => {
 S.operateReady = () => {
   const r = RANGE[st.material];
   if (!st.power) return { ok: false, label: 'شغّل الماكينة' };
-  if (!['helmet', 'gloves', 'jacket', 'clean'].every(k => st.ppe[k])) return { ok: false, label: 'كمّل قائمة «قبل ما تبدأ»' };
+  if (!['helmet', 'gloves', 'jacket', 'clean'].every(k => st.ppe[k])) return { ok: false, label: 'أكمل قائمة «قبل أن تبدأ»' };
   if (st.flowR < 3) return { ok: false, label: 'افتح الغاز' };
   const ok = st.current >= r[0] && st.current <= r[1] && st.flowR >= 7 && st.flowR <= 12 && (st.material === 'steel') === (st.mode === 'DC') && st.post >= 4;
-  return { ok: true, label: ok ? 'ابدأ اللحام' : 'ابدأ (في إعدادات مش مظبوطة)' };
+  return { ok: true, label: ok ? 'ابدأ اللحام' : 'ابدأ (بعض الإعدادات غير مضبوطة)' };
 };
 
 // weld
@@ -280,9 +280,9 @@ S.weldProc = () => {
     kind: 'arc', distName: 'طول القوس', angleName: 'زاوية التورش', settingName: 'الإعدادات (تيار/غاز)', angleShort: 'زاوية التورش',
     ideal: { angle: [70, 82], speed: [1.4, 3.0], dist: [1.5, 3.0] },
     strikeBelow: 3.5, stickBelow: 0.5, breakAbove: 7, grace: 0.15,
-    stickMsg: 'التنجستن لمس البركة واتلوّث! في الحقيقة لازم توقف وتبري التنجستن تاني. ارفع صباعك وكمّل وانت بعيد شوية.',
-    breakMsg: 'القوس طويل جداً واتقطع. في TIG القوس قصير: حوالي قطر التنجستن.',
-    pauseMsg: 'وقفت. خلّي التورش مكانه ثواني عشان الغاز بعد اللحام يحمي الخط.',
+    stickMsg: 'لمس التنجستن البركة وتلوّث! في الواقع يجب أن تتوقف وتبري التنجستن مرة أخرى. ارفع إصبعك وأكمل على مسافة أبعد قليلًا.',
+    breakMsg: 'القوس طويل جدًا وانقطع. في TIG يكون القوس قصيرًا: حوالي قطر التنجستن.',
+    pauseMsg: 'توقفت. اترك التورش مكانه بضع ثوانٍ ليحمي الغاز بعد اللحام الخط.',
     fillerLen: 0.9, aux: { label: 'سلك الإضافة', hint: 'اغمس في طرف البركة', icon: ICON.plus },
     spacing: 0.0016, distPerMM: 0.25, relDistPerPx: 0.018, arcColor: 0xcfe6ff, arcSize: 0.022, lightIntensity: 0.3, smoke: 0.4, sound: 'tig',
     bead: { color: [0.82, 0.8, 0.76], hot: [3.2, 1.6, 0.6], metal: 0.92, rough: 0.22, tint: (rr, i, n, c) => gasOK && postOK ? (i % 2 ? c.setRGB(0.86, 0.78, 0.55) : c.setRGB(0.78, 0.8, 0.86)) : c.setRGB(0.45, 0.45, 0.46) },
@@ -294,20 +294,20 @@ S.weldProc = () => {
     flags: s => ({ pore: (!gasOK ? 0.2 : 0) + (s.dist > 3.6 ? 0.1 : 0), spatter: 0, undercut: (s.speed > 3.8 || s.settings.current > r[1] + 5) ? 0.5 : 0 }),
     sparks: () => 3,
     poolMM: s => 4.5 + (s.settings.current - r[0]) * 0.02,
-    settingScore: set => ({ v: Math.max(15, 100 - pen(set.current, r, 1.8) - pen(set.flowR, [7, 12], 8) - (modeOK ? 0 : 50) - (postOK ? 0 : 15)), note: `${modeOK ? '' : 'نوع التيار مش مناسب للمعدن. '}${gasOK ? '' : 'تصرّف الغاز خارج ٧–١٢ لتر/دقيقة. '}${postOK ? '' : 'زمن الغاز بعد اللحام قليل.'}` }),
+    settingScore: set => ({ v: Math.max(15, 100 - pen(set.current, r, 1.8) - pen(set.flowR, [7, 12], 8) - (modeOK ? 0 : 50) - (postOK ? 0 : 15)), note: `${modeOK ? '' : 'نوع التيار غير مناسب للمعدن. '}${gasOK ? '' : 'تصرف الغاز خارج المدى ٧–١٢ لترًا في الدقيقة. '}${postOK ? '' : 'زمن الغاز بعد اللحام قصير.'}` }),
     penetration: set => THREE.MathUtils.clamp(((set.current - r[0]) / (r[1] - r[0])) * 0.5 + 0.7, 0.3, 1.3),
     defects: c => {
       const out = [];
-      if (c.events.stuck) out.push({ name: 'تلوّث التنجستن', en: 'Tungsten contamination', cause: 'التنجستن لمس البركة ' + c.AR(c.events.stuck) + ' مرة؛ ده بيدخّل تنجستن في الخط ويبوّظ القوس.', fix: 'حافظ على مسافة ١٫٥–٣ مم، وبري التنجستن بعد أي لمسة.' });
-      if (c.count('nofill')) out.push({ name: 'نقص امتلاء', en: 'Underfill', cause: 'ماغمستش سلك كفاية في ' + c.AR(c.count('nofill')) + ' منطقة.', fix: 'اغمس السلك في طرف البركة الأمامي بإيقاع ثابت.' });
-      if (!gasOK || c.sim.pores.count > 2) out.push({ name: 'مسامية', en: 'Porosity', cause: gasOK ? 'القوس طويل فالغاز ماغطاش البركة كويس.' : 'تصرّف الأرجون ' + st.flowR + ' لتر/دقيقة، خارج المدى المناسب.', fix: 'اضبط الغاز ٧–١٢ لتر/دقيقة وقصّر القوس.' });
-      if (!postOK || !gasOK) out.push({ name: 'أكسدة الخط (لون رمادي باهت)', en: 'Oxidation', cause: !postOK ? 'زمن الغاز بعد اللحام قليل؛ الخط اتأكسد وهو سخن.' : 'الحماية بالغاز ضعيفة.', fix: 'خلّي الـ Post-flow ٤ ثواني على الأقل وخلّي التورش مكانه لحد ما الغاز يقف.' });
-      if (!modeOK) out.push({ name: 'نوع تيار غلط', en: 'Wrong polarity/mode', cause: st.material === 'steel' ? 'لحمت صلب على AC.' : 'لحمت ألومنيوم على DC؛ طبقة الأكسيد ماتكسرتش.', fix: 'الصلب: DC−. الألومنيوم: AC.' });
-      if (c.count('fast') || st.current > r[1] + 5) out.push({ name: 'تآكل الحواف', en: 'Undercut', cause: st.current > r[1] + 5 ? 'التيار عالي.' : 'السرعة عالية.', fix: 'بطّأ واضبط التيار.' });
-      if (st.current < r[0]) out.push({ name: 'نقص الاختراق', en: 'Incomplete penetration', cause: 'التيار أقل من المناسب.', fix: 'زوّد التيار أو بطّأ.' });
+      if (c.events.stuck) out.push({ name: 'تلوّث التنجستن', en: 'Tungsten contamination', cause: 'لمس التنجستن البركة ' + c.AR(c.events.stuck) + ' مرة؛ وهذا يُدخل التنجستن في الخط ويفسد القوس.', fix: 'حافظ على مسافة ١٫٥–٣ مم، واِبرِ التنجستن بعد أي لمسة.' });
+      if (c.count('nofill')) out.push({ name: 'نقص امتلاء', en: 'Underfill', cause: 'لم تغمس سلكًا كافيًا في ' + c.AR(c.count('nofill')) + ' منطقة.', fix: 'اغمس السلك في الطرف الأمامي للبركة بإيقاع ثابت.' });
+      if (!gasOK || c.sim.pores.count > 2) out.push({ name: 'مسامية', en: 'Porosity', cause: gasOK ? 'القوس طويل، فلم يغطِّ الغاز البركة جيدًا.' : 'تصرّف الأرجون ' + st.flowR + ' لتر في الدقيقة، خارج المدى المناسب.', fix: 'اضبط الغاز على ٧–١٢ لترًا في الدقيقة وقصّر القوس.' });
+      if (!postOK || !gasOK) out.push({ name: 'أكسدة الخط (لون رمادي باهت)', en: 'Oxidation', cause: !postOK ? 'زمن الغاز بعد اللحام قصير؛ تأكسد الخط وهو ساخن.' : 'الحماية بالغاز ضعيفة.', fix: 'اجعل زمن الغاز بعد اللحام ٤ ثوانٍ على الأقل، واترك التورش مكانه حتى يتوقف الغاز.' });
+      if (!modeOK) out.push({ name: 'نوع تيار خطأ', en: 'Wrong polarity/mode', cause: st.material === 'steel' ? 'لحمت الصلب بتيار متردد AC.' : 'لحمت الألومنيوم بتيار مستمر DC؛ فلم تتكسر طبقة الأكسيد.', fix: 'الصلب: DC−. الألومنيوم: AC.' });
+      if (c.count('fast') || st.current > r[1] + 5) out.push({ name: 'تآكل الحواف', en: 'Undercut', cause: st.current > r[1] + 5 ? 'التيار عالٍ.' : 'السرعة عالية.', fix: 'أبطئ واضبط التيار.' });
+      if (st.current < r[0]) out.push({ name: 'نقص الاختراق', en: 'Incomplete penetration', cause: 'التيار أقل من المناسب.', fix: 'زِد التيار أو أبطئ.' });
       return out;
     },
-    hint: 'المس بداية الوصلة: القوس بيولّع لوحده (HF) من غير لمس. اتحرك ببطء واغمس السلك بالزرار.'
+    hint: 'المس بداية الوصلة: يشتعل القوس وحده (HF) دون لمس. تحرّك ببطء واغمس السلك بالزر.'
   };
 };
 S.hud = ctx => {
@@ -321,10 +321,10 @@ S.hud = ctx => {
 };
 S.coach = (ctx, o) => {
   const w = ctx.state.weld;
-  if (o.speed > 3.6) return 'بطّأ… TIG أبطأ من القوس العادي';
-  if (o.speed < 0.9 && ctx.sim.time > 2) return 'اتحرك شوية';
+  if (o.speed > 3.6) return 'أبطئ… لحام TIG أبطأ من القوس العادي';
+  if (o.speed < 0.9 && ctx.sim.time > 2) return 'تحرّك قليلًا';
   if (w.eff > 3.4) return 'القوس طويل، قرّب التورش';
-  if (w.eff < 1.2) return 'خلي بالك! التنجستن قرب يلمس البركة';
+  if (w.eff < 1.2) return 'انتبه! التنجستن يكاد يلمس البركة';
   if (ctx.state.angle < 66 || ctx.state.angle > 86) return 'اظبط زاوية التورش ٧٠–٨٠°';
   if (ctx.sim.time > 3 && !w.aux && Math.random() < 0.015) return 'اغمس سلك الإضافة';
   return null;

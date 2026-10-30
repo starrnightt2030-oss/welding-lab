@@ -8,8 +8,8 @@ const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 export const RANGE = { 2.5: [60, 90], 3.25: [90, 130], 4: [120, 170] };
 
 const S = {
-  id: 'smaw', name: 'اللحام بالقوس الكهربي', code: 'SMAW', icon: ICON.bolt, ready: true,
-  stages: [['explore', 'اتعرّف'], ['assemble', 'ركّب'], ['operate', 'شغّل'], ['weld', 'الحم'], ['inspect', 'افحص']],
+  id: 'smaw', name: 'اللحام بالقوس الكهربائي', code: 'SMAW', icon: ICON.bolt, ready: true,
+  stages: [['explore', 'تعرّف'], ['assemble', 'ركّب'], ['operate', 'شغّل'], ['weld', 'الحم'], ['inspect', 'افحص']],
   parts: PARTS.map(p => ({ ...p })),
   exploreMap: { plugH: 'sockets', plugG: 'sockets', switch: 'machine', box: 'electrode' }
 };
@@ -109,11 +109,11 @@ S.cams = {
 
 // ---------------- assemble
 S.asmSteps = [
-  { id: 'power', title: 'اطفي الماكينة قبل أي توصيل', hint: 'المس مفتاح التشغيل الأحمر في الماكينة عشان تحوّله لوضع الإيقاف (O).' },
-  { id: 'holderPlug', title: 'وصّل كابل الماسك بالطرف الموجب (+)', hint: 'المس فيشة كابل الماسك اللي على الأرض، وبعدين المس الطرف المناسب في الماكينة.' },
-  { id: 'groundPlug', title: 'وصّل كابل الأرضي بالطرف السالب (−)', hint: 'المس فيشة كابل الأرضي، وبعدين المس الطرف الفاضي.' },
-  { id: 'clamp', title: 'ثبّت ماسك الأرضي على طاولة اللحام', hint: 'المس ماسك الأرضي اللي على الأرض عشان تثبّته على حرف الطاولة المعدنية.' },
-  { id: 'electrode', title: 'ركّب القطب في فكوك الماسك', hint: 'المس علبة الأقطاب عشان تاخد قطب وتركّبه من طرفه العاري.' }
+  { id: 'power', title: 'أطفئ الماكينة قبل أي توصيل', hint: 'المس مفتاح التشغيل الأحمر في الماكينة لتحوّله إلى وضع الإيقاف (O).' },
+  { id: 'holderPlug', title: 'وصّل كابل الماسك بالطرف الموجب (+)', hint: 'المس قابس كابل الماسك الموجود على الأرض، ثم المس الطرف المناسب في الماكينة.' },
+  { id: 'groundPlug', title: 'وصّل كابل الأرضي بالطرف السالب (−)', hint: 'المس قابس كابل الأرضي، ثم المس الطرف الفارغ.' },
+  { id: 'clamp', title: 'ثبّت ماسك الأرضي على طاولة اللحام', hint: 'المس ماسك الأرضي الموجود على الأرض لتثبّته على حافة الطاولة المعدنية.' },
+  { id: 'electrode', title: 'ركّب القطب في فكوك الماسك', hint: 'المس علبة الأقطاب لتأخذ قطبًا وتركّبه من طرفه العاري.' }
 ];
 S.asmStart = () => { setPower(true); };
 S.asmTargets = (step, ctx) => {
@@ -129,38 +129,38 @@ function moveObj(ctx, obj, toP, toR, dur, done0) {
 S.asmPick = (id, ctx, r) => {
   const step = S.asmSteps[ctx.state.asm.step]; if (!step) return;
   const a = ctx.state.asm;
-  if (st.power && step.id !== 'power' && id !== 'switch') return ctx.asmMsg('bad', 'خطر! الماكينة لسه شغالة. ماينفعش توصّل أي كابل والماكينة شغالة.');
+  if (st.power && step.id !== 'power' && id !== 'switch') return ctx.asmMsg('bad', 'خطر! الماكينة ما زالت تعمل. لا يصح توصيل أي كابل والماكينة تعمل.');
   switch (step.id) {
     case 'power':
-      if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة اتطفت. كده آمن تبدأ التوصيل.'); }
-      else ctx.asmMsg('bad', 'استنى! أول خطوة دايماً إنك تطفي الماكينة قبل أي توصيل.');
+      if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('تم إطفاء الماكينة. الآن يمكنك البدء في التوصيل بأمان.'); }
+      else ctx.asmMsg('bad', 'انتظر! الخطوة الأولى دائمًا هي إطفاء الماكينة قبل أي توصيل.');
       break;
     case 'holderPlug': case 'groundPlug': {
       const isH = step.id === 'holderPlug', plug = isH ? plugH : plugG;
       if (!a.picked) {
-        if (id === (isH ? 'plugH' : 'plugG')) { a.picked = true; ctx.asmMsg('info', 'تمام. دلوقتي المس الطرف اللي هتوصّل فيه الفيشة.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); }
-        else if (id === (isH ? 'plugG' : 'plugH')) ctx.asmMsg('bad', isH ? 'دي فيشة كابل الأرضي. ابدأ بكابل الماسك (الكابل اللي رايح لماسك القطب).' : 'كابل الماسك اتوصّل خلاص. المس فيشة كابل الأرضي.');
-        else ctx.asmMsg('bad', 'المس الفيشة اللي على الأرض الأول.');
+        if (id === (isH ? 'plugH' : 'plugG')) { a.picked = true; ctx.asmMsg('info', 'جيد. الآن المس الطرف الذي ستوصّل به القابس.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); }
+        else if (id === (isH ? 'plugG' : 'plugH')) ctx.asmMsg('bad', isH ? 'هذا قابس كابل الأرضي. ابدأ بكابل الماسك (الكابل المتجه إلى ماسك القطب).' : 'تم توصيل كابل الماسك. المس قابس كابل الأرضي.');
+        else ctx.asmMsg('bad', 'المس القابس الموجود على الأرض أولًا.');
         return;
       }
-      if (id !== 'sockets') return ctx.asmMsg('bad', 'المس واحد من أطراف التوصيل في الماكينة (+ أو −).');
+      if (id !== 'sockets') return ctx.asmMsg('bad', 'المس أحد أطراف التوصيل في الماكينة (+ أو −).');
       const which = r && r.object === m.sockets.minus ? 'minus' : 'plus';
-      if (isH && which === 'minus') return ctx.asmMsg('bad', 'كده القطبية مباشرة (DCEN). في التمرين ده بنستخدم القطبية العكسية: الماسك على الموجب (+).');
-      if (!isH && which === 'plus') return ctx.asmMsg('bad', 'الطرف الموجب عليه كابل الماسك خلاص. الأرضي بيروح للسالب (−).');
+      if (isH && which === 'minus') return ctx.asmMsg('bad', 'هذه قطبية مباشرة (DCEN). في هذا التمرين نستخدم القطبية العكسية: الماسك على الموجب (+).');
+      if (!isH && which === 'plus') return ctx.asmMsg('bad', 'الطرف الموجب عليه كابل الماسك بالفعل. الأرضي يُوصّل بالسالب (−).');
       a.picked = null; ctx.E.setHighlight([]);
-      moveObj(ctx, plug, m.socketWorld(which).add(V3(0, 0, 0.012)), new THREE.Euler(0, 0, 0), 1.0, () => { asm[isH ? 'plugH' : 'plugG'] = true; ctx.audio.sfx('clunk'); ctx.next(isH ? 'ممتاز! الماسك على الموجب = قطبية عكسية DCEP.' : 'تمام! كابل الأرضي على السالب، والدايرة قربت تكمل.'); });
+      moveObj(ctx, plug, m.socketWorld(which).add(V3(0, 0, 0.012)), new THREE.Euler(0, 0, 0), 1.0, () => { asm[isH ? 'plugH' : 'plugG'] = true; ctx.audio.sfx('clunk'); ctx.next(isH ? 'ممتاز! الماسك على الموجب = قطبية عكسية DCEP.' : 'جيد! كابل الأرضي على السالب، والدائرة على وشك الاكتمال.'); });
       break;
     }
     case 'clamp':
-      if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1.0, () => { asm.clamp = true; updateCables(); ctx.next('ماسك الأرضي متثبّت على الطاولة المعدنية، والطاولة متلامسة مع قطع الشغل.'); }); }
-      else ctx.asmMsg('bad', 'المس ماسك الأرضي (المشبك الأحمر اللي على الأرض).');
+      if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1.0, () => { asm.clamp = true; updateCables(); ctx.next('ماسك الأرضي مثبّت على الطاولة المعدنية، والطاولة ملامسة لقطع العمل.'); }); }
+      else ctx.asmMsg('bad', 'المس ماسك الأرضي (المشبك الأحمر الموجود على الأرض).');
       break;
     case 'electrode':
       if (id === 'box') {
         ctx.E.setHighlight([]); electrode.visible = true; electrode.position.set(0.25, 0.05, 0.25);
         const p0 = electrode.position.clone();
-        ctx.state.asm.busy = true; ctx.E.tween(0.9, k => electrode.position.lerpVectors(p0, V3(0.035, 0, 0), ctx.ease(k)), () => { ctx.state.asm.busy = false; asm.electrode = true; ctx.next('القطب اتركّب من طرفه العاري. المعدة جاهزة للتشغيل!'); });
-      } else ctx.asmMsg('bad', 'المس علبة الأقطاب اللي على الطاولة.');
+        ctx.state.asm.busy = true; ctx.E.tween(0.9, k => electrode.position.lerpVectors(p0, V3(0.035, 0, 0), ctx.ease(k)), () => { ctx.state.asm.busy = false; asm.electrode = true; ctx.next('تم تركيب القطب من طرفه العاري. المعدات جاهزة للتشغيل!'); });
+      } else ctx.asmMsg('bad', 'المس علبة الأقطاب الموجودة على الطاولة.');
       break;
   }
 };
@@ -180,9 +180,9 @@ S.operateEnter = ctx => { updateMachine(); ctx.E.setHighlight([m.knob]); setTime
 S.operatePick = (id, ctx) => { if (id === 'switch') { setPower(!st.power); ctx.audio.click(); ctx.renderPanel(); } };
 function status() {
   const [lo, hi] = RANGE[st.dia], c = st.current;
-  return c < lo ? ['low', 'أقل من اللازم', 'التيار قليل: القطب هيلزق في الشغلانة والاختراق هيبقى ضعيف. زوّد التيار.']
-    : c > hi ? ['high', 'أعلى من اللازم', 'التيار عالي: رذاذ كتير وتآكل في الحواف، والقطب هيسخن ويحمرّ. قلّل التيار.']
-    : ['ok', 'مظبوط', 'التيار في المدى المناسب. ابدأ بالقيمة دي وعدّلها حسب شكل الخط.'];
+  return c < lo ? ['low', 'أقل من اللازم', 'التيار منخفض: سيلتصق القطب بقطعة العمل ويضعف الاختراق. زِد التيار.']
+    : c > hi ? ['high', 'أعلى من اللازم', 'التيار عالٍ: رذاذ كثير وتآكل في الحواف، وسيسخن القطب ويحمرّ. قلّل التيار.']
+    : ['ok', 'مضبوط', 'التيار في المدى المناسب. ابدأ بهذه القيمة وعدّلها حسب شكل الخط.'];
 }
 S.operateHTML = () => {
   const [lo, hi] = RANGE[st.dia], c = st.current, s = status(), pct = v => ((v - 40) / 160) * 100;
@@ -193,16 +193,16 @@ S.operateHTML = () => {
       <div class="cur-ctl">
         <button type="button" class="round" data-op="cur-" aria-label="قلّل التيار">${ICON.minus}</button>
         <div class="cur-val"><span class="mono">${c}</span><small class="mono">A</small></div>
-        <button type="button" class="round acc" data-op="cur+" aria-label="زوّد التيار">${ICON.plus}</button>
+        <button type="button" class="round acc" data-op="cur+" aria-label="زِد التيار">${ICON.plus}</button>
       </div>
       <input type="range" min="40" max="200" step="5" value="${c}" data-op="current" aria-label="شدة التيار بالأمبير">
       <div class="meter" dir="ltr"><div class="zone" style="left:${pct(lo)}%;width:${pct(hi) - pct(lo)}%"></div><div class="mark ${s[0]}" style="left:${pct(c)}%"></div></div>
       <div class="scale mono" dir="ltr"><span>40</span><span class="ok-t">${lo}–${hi} A</span><span>200</span></div>
       <p class="muted small">${s[2]}</p></section>
-    <section class="card"><h3 class="sm">القطبية</h3><p class="small">الماسك على الموجب = <b class="mono accent">DC+</b> قطبية عكسية (اختراق أعمق). اتحددت من التوصيل في «ركّب».</p></section>
-    <section class="card"><h3 class="sm">قبل ما تقدح القوس، البس مهمات الوقاية</h3>
+    <section class="card"><h3 class="sm">القطبية</h3><p class="small">الماسك على الموجب = <b class="mono accent">DC+</b> قطبية عكسية (اختراق أعمق). تحددت من التوصيل في مرحلة «ركّب».</p></section>
+    <section class="card"><h3 class="sm">قبل إشعال القوس، ارتدِ مهمات الوقاية</h3>
       <div class="ppe">${PPE.map(p => `<button type="button" class="${st.ppe[p.id] ? 'on' : ''}" data-op="ppe:${p.id}">${st.ppe[p.id] ? ICON.check : ICON.shield}${p.name}</button>`).join('')}</div></section>
-    <button type="button" class="btn ${st.power ? 'on-green' : ''}" data-op="power">${ICON.bolt}${st.power ? 'الماكينة شغالة' : 'شغّل الماكينة'}</button>`;
+    <button type="button" class="btn ${st.power ? 'on-green' : ''}" data-op="power">${ICON.bolt}${st.power ? 'الماكينة تعمل' : 'شغّل الماكينة'}</button>`;
 };
 S.operateAction = (op, el, ctx) => {
   if (op.startsWith('dia:')) st.dia = +op.slice(4);
@@ -214,7 +214,7 @@ S.operateAction = (op, el, ctx) => {
 };
 S.operateReady = () => {
   const ok = status()[0] === 'ok', ppe = PPE.every(p => st.ppe[p.id]);
-  return { ok: ok && ppe && st.power, label: ok && ppe && st.power ? 'ابدأ اللحام' : !ppe ? 'البس مهمات الوقاية الأول' : !st.power ? 'شغّل الماكينة الأول' : 'اظبط التيار الأول' };
+  return { ok: ok && ppe && st.power, label: ok && ppe && st.power ? 'ابدأ اللحام' : !ppe ? 'ارتدِ مهمات الوقاية أولًا' : !st.power ? 'شغّل الماكينة أولًا' : 'اضبط التيار أولًا' };
 };
 
 // ---------------- weld
@@ -225,10 +225,10 @@ S.weldProc = () => {
     kind: 'arc', distName: 'طول القوس', angleName: 'زاوية القطب', settingName: 'ضبط التيار',
     ideal: { angle: [65, 80], speed: [2.5, 4.5], dist: [d * 0.8, d * 1.35] },
     strikeBelow: 4, stickBelow: 0.6, breakAbove: 9,
-    stickMsg: 'القطب لزق في الشغلانة! القوس قصير جداً. ارفع صباعك وابدأ تاني.',
-    breakMsg: 'القوس اتقطع لأنه طويل جداً. قرّب القطب من الشغلانة.',
-    pauseMsg: 'وقفت القوس. المس تاني وكمّل من آخر نقطة.',
-    consumable: { len: 0.35, min: 0.05, rate: s => (s.current / 120) * 4.2 * (d === 2.5 ? 1.25 : d === 4 ? 0.8 : 1) / 1000, name: 'القطب', newName: 'قطب جديد', outMsg: 'القطب خلص. غيّر القطب وكمّل.', newMsg: 'ركّبت قطب جديد. كمّل من آخر نقطة.' },
+    stickMsg: 'التصق القطب بقطعة العمل! القوس قصير جدًا. ارفع إصبعك وابدأ مرة أخرى.',
+    breakMsg: 'انقطع القوس لأنه طويل جدًا. قرّب القطب من قطعة العمل.',
+    pauseMsg: 'أوقفت القوس. المس مرة أخرى وأكمل من آخر نقطة.',
+    consumable: { len: 0.35, min: 0.05, rate: s => (s.current / 120) * 4.2 * (d === 2.5 ? 1.25 : d === 4 ? 0.8 : 1) / 1000, name: 'القطب', newName: 'قطب جديد', outMsg: 'انتهى القطب. غيّر القطب وأكمل.', newMsg: 'تم تركيب قطب جديد. أكمل من آخر نقطة.' },
     slag: true, spacing: 0.0011, distPerMM: 0.3, arcColor: 0xffffff,
     dims: s => {
       const heat = THREE.MathUtils.clamp((s.settings.current - lo) / (hi - lo), -0.6, 1.6);
@@ -244,15 +244,15 @@ S.weldProc = () => {
     penetration: set => THREE.MathUtils.clamp(((set.current - lo) / (hi - lo)) * 0.6 + 0.6, 0.2, 1.3),
     defects: c => {
       const out = [], cur = c.settings.current;
-      if (c.count('fast') || cur > hi + 5) out.push({ name: 'تآكل الحواف', en: 'Undercut', cause: cur > hi + 5 ? 'التيار أعلى من المدى المناسب.' : 'سرعة تقدّم عالية في ' + c.AR(c.count('fast')) + ' منطقة.', fix: 'بطّأ الحركة، وقلّل التيار لو عالي، وخلّي القطب يملا الحواف.' });
-      if (c.count('slow')) out.push({ name: 'خط عالي وعريض (تراكب)', en: 'Overlap', cause: 'الحركة بطيئة زيادة فالمعدن اتكوّم.', fix: 'زوّد سرعة التقدّم بانتظام.' });
-      if (c.count('long') || c.sim.spatter.count > 20) out.push({ name: 'رذاذ', en: 'Spatter', cause: 'القوس طويل' + (cur > hi ? ' والتيار عالي.' : '.'), fix: 'خلّي طول القوس قريب من قطر القطب (حوالي ' + d + ' مم).' });
-      if (c.sim.pores.count > 2) out.push({ name: 'مسامية', en: 'Porosity', cause: 'القوس طويل جداً فالغاز الواقي ماقدرش يحمي المنصهر.', fix: 'قصّر القوس وحافظ عليه ثابت.' });
-      if (cur < lo || c.count('short')) out.push({ name: 'نقص الاندماج', en: 'Lack of fusion', cause: cur < lo ? 'التيار أقل من المدى المناسب.' : 'القوس قصير جداً.', fix: 'اظبط التيار في المدى المناسب وحافظ على طول القوس.' });
-      if (c.events.stuck) out.push({ name: 'التصاق القطب', en: 'Electrode sticking', cause: 'القطب لزق ' + c.AR(c.events.stuck) + ' مرة.', fix: 'بعد القدح ارفع القطب بسرعة لطول القوس الصحيح.' });
+      if (c.count('fast') || cur > hi + 5) out.push({ name: 'تآكل الحواف', en: 'Undercut', cause: cur > hi + 5 ? 'التيار أعلى من المدى المناسب.' : 'سرعة تقدّم عالية في ' + c.AR(c.count('fast')) + ' منطقة.', fix: 'أبطئ الحركة، وقلّل التيار إذا كان عاليًا، واجعل القطب يملأ الحواف.' });
+      if (c.count('slow')) out.push({ name: 'خط مرتفع وعريض (تراكب)', en: 'Overlap', cause: 'الحركة بطيئة جدًا، فتكوّم المعدن.', fix: 'زِد سرعة التقدم بانتظام.' });
+      if (c.count('long') || c.sim.spatter.count > 20) out.push({ name: 'رذاذ', en: 'Spatter', cause: 'القوس طويل' + (cur > hi ? ' والتيار عالٍ.' : '.'), fix: 'اجعل طول القوس قريبًا من قطر القطب (حوالي ' + d + ' مم).' });
+      if (c.sim.pores.count > 2) out.push({ name: 'مسامية', en: 'Porosity', cause: 'القوس طويل جدًا، فلم يستطع الغاز الواقي حماية المعدن المنصهر.', fix: 'قصّر القوس وحافظ على ثباته.' });
+      if (cur < lo || c.count('short')) out.push({ name: 'نقص الاندماج', en: 'Lack of fusion', cause: cur < lo ? 'التيار أقل من المدى المناسب.' : 'القوس قصير جدًا.', fix: 'اضبط التيار في المدى المناسب وحافظ على طول القوس.' });
+      if (c.events.stuck) out.push({ name: 'التصاق القطب', en: 'Electrode sticking', cause: 'التصق القطب ' + c.AR(c.events.stuck) + ' مرة.', fix: 'بعد إشعال القوس ارفع القطب بسرعة إلى طول القوس الصحيح.' });
       return out;
     },
-    hint: 'المس الدايرة البرتقالي عند بداية الوصلة وحرّك صباعك ببطء لليمين. فوق الخط الأخضر = قوس أطول، تحته = أقصر.'
+    hint: 'المس الدائرة البرتقالية عند بداية الوصلة وحرّك إصبعك ببطء إلى اليمين. أعلى الخط الأخضر = قوس أطول، وأسفله = أقصر.'
   };
 };
 S.hud = ctx => {
@@ -266,11 +266,11 @@ S.hud = ctx => {
 };
 S.coach = (ctx, o) => {
   const d = st.dia, w = ctx.state.weld, a = ctx.state.angle;
-  if (o.speed > 5.3) return 'سرعتك عالية، بطّأ حركة إيدك';
-  if (o.speed < 1.7 && ctx.sim.time > 1) return 'سرعتك بطيئة، حرّك أسرع شوية';
+  if (o.speed > 5.3) return 'سرعتك عالية، أبطئ حركة يدك';
+  if (o.speed < 1.7 && ctx.sim.time > 1) return 'سرعتك بطيئة، تحرّك أسرع قليلًا';
   if (w.eff > d * 1.35 + 0.4) return 'القوس طويل، قرّب القطب';
-  if (w.eff < d * 0.8 - 0.3) return 'القوس قصير، ارفع القطب شوية';
-  if (a < 62 || a > 83) return 'اظبط زاوية القطب بين ٦٥ و٨٠ درجة';
+  if (w.eff < d * 0.8 - 0.3) return 'القوس قصير، ارفع القطب قليلًا';
+  if (a < 62 || a > 83) return 'اضبط زاوية القطب بين ٦٥ و٨٠ درجة';
   return null;
 };
 let tick = 0;
