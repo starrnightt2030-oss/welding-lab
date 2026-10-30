@@ -7,12 +7,15 @@ import { Textures } from '../textures.js';
 import { ICON } from '../core/icons.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+
+export function makeWire(VAR) {
+const CO2 = VAR === 'co2';
 const S = {
-  id: 'mig', name: 'اللحام بالسلك والغاز', code: 'MIG / MAG', icon: ICON.mig, ready: true,
+  id: CO2 ? 'co2' : 'mig', name: CO2 ? 'اللحام بثاني أكسيد الكربون' : 'اللحام بالسلك والغاز الخامل', code: CO2 ? 'CO₂ / MAG' : 'MIG', icon: ICON.mig, ready: true,
   stages: [['explore', 'اتعرّف'], ['assemble', 'ركّب'], ['operate', 'شغّل'], ['weld', 'الحم'], ['inspect', 'افحص']]
 };
 S.parts = [
-  { id: 'machine', name: 'ماكينة MIG/MAG', en: 'MIG power source (CV)', far: 1.0,
+  { id: 'machine', name: CO2 ? 'ماكينة لحام CO₂' : 'ماكينة MIG', en: CO2 ? 'CO₂ welding power source (CV)' : 'MIG power source (CV)', far: 1.0,
     desc: 'ماكينة جهد ثابت (CV)، فيها وحدة تغذية سلك بتسحب السلك من البكرة وتدفعه في التورش بسرعة ثابتة.',
     facts: ['MIG = غاز خامل (أرجون) للألومنيوم. MAG = غاز نشط (CO₂ أو خليط أرجون + CO₂) للصلب.'], safety: 'افصل الكهربا قبل ما تفتح باب البكرة.' },
   { id: 'panel', name: 'منظّم الجهد وسرعة السلك', en: 'Voltage & wire-feed speed', far: 0.42,
@@ -26,15 +29,24 @@ S.parts = [
     desc: 'فيه زناد (زرار) بيشغّل السلك والغاز والتيار مع بعض، ورقبة منحنية، وفوهة غاز، وجواها فونية نحاس التلامس.',
     facts: ['الفونية (Contact tip) لازم تناسب قطر السلك.', 'نضّف الفوهة من الرذاذ أول بأول.'], safety: '' },
   { id: 'euro', name: 'وصلة التورش (يورو)', en: 'Euro connector', far: 0.4, desc: 'وصلة واحدة بتوصّل التيار والغاز والسلك والتحكم للتورش.', facts: ['في السلك الصلب مع الغاز، التورش موجب (DCEP).'], safety: '' },
-  { id: 'cylinder', name: 'أسطوانة الغاز الخليط', en: 'Ar + CO₂ cylinder', far: 1.0,
-    desc: 'خليط أرجون مع ٨–٢٠٪ CO₂ بيدّي قوس هادي ورذاذ أقل من CO₂ النقي.', facts: ['CO₂ النقي أرخص واختراقه أعمق بس رذاذه أكتر.'], safety: 'ثبّت الأسطوانة بالجنزير.' },
-  { id: 'flow', name: 'عداد الغاز', en: 'Flowmeter', far: 0.4, desc: 'التصرف المناسب غالباً ١٢–١٦ لتر/دقيقة.', facts: [], safety: '' },
+  CO2 ? { id: 'cylinder', name: 'أسطوانة ثاني أكسيد الكربون', en: 'CO₂ cylinder', far: 1.0,
+    desc: 'ثاني أكسيد الكربون غاز نشط، رخيص، واختراقه عميق في الصلب. جوه الأسطوانة بيبقى سائل تحت ضغط حوالي ٥٠–٦٠ بار.',
+    facts: ['لونها عندنا رمادي، ومكتوب عليها CO₂.', 'رذاذه أكتر من الخليط، والخط شكله أخشن شوية.'], safety: 'لازم تبقى واقفة ومربوطة. وماتشتغلش في مكان مقفول؛ الغاز بيطرد الأكسجين.' }
+  : { id: 'cylinder', name: 'أسطوانة الأرجون / الخليط', en: 'Argon / Ar+CO₂ cylinder', far: 1.0,
+    desc: 'الأرجون غاز خامل مابيتفاعلش مع المعدن المنصهر. نقي للألومنيوم، ومخلوط بشوية CO₂ للصلب عشان القوس يبقى هادي ورذاذه قليل.',
+    facts: ['لونها رمادي بكتف أخضر غامق.'], safety: 'ثبّت الأسطوانة بالجنزير.' },
+  CO2 ? { id: 'flow', name: 'منظم CO₂ بالسخّان', en: 'Heated CO₂ regulator', far: 0.4,
+    desc: 'الـCO₂ لما بيتمدد بيبرد جداً وممكن يجمّد المنظم ويسدّه؛ عشان كده المنظم فيه سخّان كهربا بيتوصّل في الماكينة (٣٦ فولت).',
+    facts: ['التصرف المناسب ١٢–١٨ لتر/دقيقة.', 'لو المنظم اتلج من بره يبقى السخّان مش شغال.'], safety: '' }
+  : { id: 'flow', name: 'عداد الغاز', en: 'Flowmeter', far: 0.4, desc: 'التصرف المناسب غالباً ١٢–١٦ لتر/دقيقة.', facts: [], safety: '' },
   { id: 'clamp', name: 'ماسك الأرضي', en: 'Work clamp', far: 0.4, desc: 'في MAG بالسلك الصلب بيتوصل على السالب.', facts: [], safety: '' },
   { id: 'plates', name: 'قطع الشغل', en: 'Workpieces 6 mm', far: 0.4, desc: 'صلب ٦ مم، وصلة تناكبية.', facts: [], safety: '' }
 ];
 
 let ctxRef, m, cyl, flow, torch, wire, clamp, plugT, plugG, cableT, cableG, gasHose, spool, spoolBox, door, rolls;
-const st = { wd: 0.8, thick: 6, volt: 16, wfs: 8, flowR: 0, power: true, ppe: {} };
+const st = { wd: 0.8, thick: 6, volt: 16, wfs: 8, flowR: 0, power: true, ppe: {}, heater: false };
+const FLOW = CO2 ? [12, 18] : [12, 16];
+let heater, heaterCable;
 const asm = {};
 const DL = V3(0.5, -0.866, 0);
 const ROOT = V3(-0.62, 0, 0.02);
@@ -61,11 +73,11 @@ S.build = ctx => {
   ctxRef = ctx;
   const M = ctx.M, R = S.root;
   m = buildInverter(M, {
-    w: W, h: H, d: D, y: Y0, color: 0x3a4250, cart: true, dispW: 0.08,
+    w: W, h: H, d: D, y: Y0, color: CO2 ? 0x1f5fa8 : 0x3a4250, cart: true, dispW: 0.08,
     dispUV: [0.3, 0.16], swUV: [0.2, 0.47], ledUV: [0.12, 0.3], knobs: [[0.3, 0.33], [0.72, 0.33]],
     sockets: [['euro', 0.5, 0.82, false], ['minus', 0.82, 0.82, false], ['plus', 0.18, 0.82, true]],
     draw: (c, w, h) => {
-      c.fillStyle = '#c9cfd9'; c.textAlign = 'center'; c.font = '600 34px "IBM Plex Mono", monospace'; c.fillText('MIG 250', w / 2, 52);
+      c.fillStyle = '#c9cfd9'; c.textAlign = 'center'; c.font = '600 34px "IBM Plex Mono", monospace'; c.fillText(CO2 ? 'CO2 MAG 250' : 'MIG 250', w / 2, 52);
       c.fillStyle = '#3ddc97'; c.fillRect(w / 2 - 100, 64, 200, 4);
       c.font = '600 22px "IBM Plex Sans Arabic", sans-serif'; c.fillStyle = '#9aa3b1'; c.fillText('الجهد V', w * 0.3, 330); c.fillText('سرعة السلك', w * 0.72, 330);
       c.font = '600 42px "IBM Plex Mono", monospace'; c.fillStyle = '#ff7b6b'; c.fillText('+', w * 0.18, 690); c.fillStyle = '#e1e5ea'; c.fillText('−', w * 0.82, 690);
@@ -80,7 +92,7 @@ S.build = ctx => {
   // euro socket detail
   const eu = mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.02, 24), M.brass); eu.rotation.x = Math.PI / 2; m.sockets.euro.add(eu);
   // side door open on +X with spool inside
-  door = mesh(new THREE.BoxGeometry(0.004, H - 0.06, D - 0.16), new THREE.MeshPhysicalMaterial({ color: 0x3a4250, roughness: 0.45, clearcoat: 0.3 }));
+  door = mesh(new THREE.BoxGeometry(0.004, H - 0.06, D - 0.16), new THREE.MeshPhysicalMaterial({ color: CO2 ? 0x1f5fa8 : 0x3a4250, roughness: 0.45, clearcoat: 0.3 }));
   const hinge = new THREE.Group(); hinge.position.set(W / 2 + 0.003, 0, D / 2 - 0.08); m.body.add(hinge);
   door.position.set(0, 0, -(D - 0.16) / 2); hinge.add(door); hinge.rotation.y = -1.25;
   const cavity = mesh(new THREE.BoxGeometry(0.002, H - 0.07, D - 0.17), new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.9 })); cavity.position.set(W / 2 + 0.0015, 0, 0); m.body.add(cavity);
@@ -98,9 +110,18 @@ S.build = ctx => {
   spoolBox.position.set(-0.2, 0, 0.45); R.add(spoolBox);
   R.add(spool);
 
-  cyl = buildCylinder(M, { h: 1.25, r: 0.1, color: 0x6c7076, shoulder: 0x3c8a4f, labelAr: 'أرجون + CO₂', labelEn: 'Ar/CO₂', valve: 'wheel' });
+  cyl = CO2 ? buildCylinder(M, { h: 1.3, r: 0.11, color: 0x8a9096, shoulder: 0x55595e, labelAr: 'ثاني أكسيد الكربون', labelEn: 'CO₂', valve: 'wheel' })
+    : buildCylinder(M, { h: 1.25, r: 0.1, color: 0x6c7076, shoulder: 0x1f5a3a, labelAr: 'أرجون', labelEn: 'Ar', valve: 'wheel' });
   cyl.position.set(-0.98, 0, -0.2); R.add(cyl);
   flow = buildFlowmeter(M); R.add(flow);
+  if (CO2) {
+    heater = new THREE.Group();
+    const hb = mesh(new RoundedBoxGeometry(0.045, 0.05, 0.04, 2, 0.006), new THREE.MeshPhysicalMaterial({ color: 0xb8261e, roughness: 0.4, clearcoat: 0.5 })); heater.add(hb);
+    for (let i = 0; i < 5; i++) { const f = mesh(new THREE.BoxGeometry(0.047, 0.003, 0.042), new THREE.MeshStandardMaterial({ color: 0x5a1210, roughness: 0.6 })); f.position.y = -0.02 + i * 0.01; heater.add(f); }
+    const lamp = mesh(new THREE.SphereGeometry(0.004, 10, 8), new THREE.MeshStandardMaterial({ color: 0x331a08 })); lamp.position.set(0, 0.012, 0.021); heater.add(lamp); heater.userData.lamp = lamp;
+    heater.position.set(0.03, -0.035, 0); flow.add(heater);
+    heaterCable = new Cable(M, 0.0035); R.add(heaterCable.mesh);
+  }
   torch = buildTorch(M); R.add(torch); wire = torch.userData.wire;
   clamp = buildClamp(M); R.add(clamp);
   plugT = new THREE.Group();
@@ -112,7 +133,7 @@ S.build = ctx => {
   gasHose = new Cable({ rubber: new THREE.MeshStandardMaterial({ color: 0x1a1c1f, roughness: 0.6 }) }, 0.004); R.add(gasHose.mesh);
   const tag = (o, id) => { o.userData.pick = id; };
   tag(m.body, 'machine'); tag(m.disp, 'panel'); tag(d2, 'panel'); m.knobs.forEach(k => tag(k, 'panel')); tag(m.sockets.euro, 'euro'); tag(m.sockets.minus, 'sockets'); tag(m.sockets.plus, 'sockets');
-  tag(spool, 'spool'); tag(spoolBox, 'spoolBox'); tag(rolls, 'drive'); tag(cyl, 'cylinder'); tag(flow, 'flow'); tag(torch, 'torch'); tag(clamp, 'clamp'); tag(plugT, 'plugT'); tag(plugG, 'plugG'); tag(m.sw, 'switch'); tag(cableT.mesh, 'torch'); tag(cableG.mesh, 'clamp');
+  tag(spool, 'spool'); tag(spoolBox, 'spoolBox'); tag(rolls, 'drive'); tag(cyl, 'cylinder'); tag(flow, 'flow'); if (heater) tag(heater, 'flow'); tag(torch, 'torch'); tag(clamp, 'clamp'); tag(plugT, 'plugT'); tag(plugG, 'plugG'); tag(m.sw, 'switch'); tag(cableT.mesh, 'torch'); tag(cableG.mesh, 'clamp');
   S._pick = [m.body, m.disp, d2, ...m.knobs, m.sockets.euro, m.sockets.minus, m.sockets.plus, spool, spoolBox, rolls, cyl, flow, torch, clamp, plugT, plugG, m.sw, cableT.mesh, cableG.mesh];
   S.setAssembled(true); setPower(true);
 };
@@ -140,12 +161,14 @@ function spoolPose(inside) {
 function updateCables(free) {
   cableT.update(anc(plugT, plugT.userData.cableAnchor), dirW(plugT, V3(0, 0, 1)), anc(torch, torch.userData.anchor), dirW(torch, V3(-1, 0.1, 0)).normalize(), { bSide: free ? 'free' : 'table', lipX: 0.58 });
   cableG.update(anc(plugG, plugG.userData.cableAnchor), dirW(plugG, V3(0, 0, 1)), anc(clamp, clamp.userData.cableAnchor), dirW(clamp, V3(-1, 0, 0)), { bSide: asm.clamp ? 'hang' : 'floor' });
+  if (heaterCable) { heaterCable.mesh.visible = !!asm.gas; if (asm.gas) heaterCable.update(anc(heater, V3(0, -0.02, 0)), V3(0, -1, 0), anc(m.body, V3(-W / 2 + 0.04, -H / 2 + 0.06, D / 2 + 0.005)), V3(0, 0, 1), { bSide: 'floor' }); }
   gasHose.mesh.visible = !!asm.gas;
   if (asm.gas) gasHose.update(outletW(flow), V3(1, -0.4, 0.3).normalize(), anc(m.body, V3(0.1, -0.15, -D / 2 - 0.01)), V3(0, 0, -1), { bSide: 'floor' });
 }
 S.afterMove = () => updateCables();
 function setPower(on) { st.power = on; m.sw.userData.rocker.rotation.x = on ? -0.18 : 0.18; m.led.material = on ? ctxRef.M.ledGreenOn : ctxRef.M.ledGreenOff; updateMachine(); }
 function updateMachine() {
+  if (heater) heater.userData.lamp.material = st.heater && st.power ? new THREE.MeshStandardMaterial({ color: 0xffa040, emissive: 0xff7a1a, emissiveIntensity: 3 }) : new THREE.MeshStandardMaterial({ color: 0x331a08 });
   m.knobs[0].rotation.z = THREE.MathUtils.degToRad(135 - ((st.volt - 12) / 18) * 270);
   m.knobs[1].rotation.z = THREE.MathUtils.degToRad(135 - ((st.wfs - 1) / 14) * 270);
   m.draw(st.volt.toFixed(1), st.power, '#ffae5c'); m.draw2(st.wfs.toFixed(1), st.power);
@@ -214,19 +237,19 @@ S.asmPick = (id, ctx, r) => {
   const a = ctx.state.asm, s = S.asmSteps[a.step]; if (!s) return;
   if (st.power && s.id !== 'power' && id !== 'switch') return ctx.asmMsg('bad', 'اطفي الماكينة الأول.');
   switch (s.id) {
-    case 'power': if (id === 'switch') { setPower(false); ctx.audio.click(); ctx.next('الماكينة مطفية، وباب البكرة مفتوح.'); } else ctx.asmMsg('bad', 'اطفي الماكينة الأول.'); break;
+    case 'power': if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة مطفية، وباب البكرة مفتوح.'); } else ctx.asmMsg('bad', 'اطفي الماكينة الأول.'); break;
     case 'spool': if (id === 'spoolBox' || id === 'spool') { m.root.updateMatrixWorld(true); const to = anc(m.body, V3(W / 2 - 0.07, 0.06, -0.05)); moveObj(ctx, spool, to, new THREE.Euler(0, 0, Math.PI / 2), 1.1, () => { asm.spool = true; ctx.next('البكرة اتركبت، وطرف السلك ماسكه عشان مايفكّش.'); }); } else ctx.asmMsg('bad', 'المس كرتونة البكرة.'); break;
-    case 'drive': if (id === 'drive') { asm.drive = true; ctx.audio.click(); ctx.next('بكر التغذية بمجرى ٠٫٨ (حرف V للسلك الصلب)، والضغط متوسط.'); } else ctx.asmMsg('bad', 'المس بكر التغذية جوه الماكينة (جنب البكرة).'); break;
+    case 'drive': if (id === 'drive') { asm.drive = true; ctx.audio.sfx('clunk'); ctx.next('بكر التغذية بمجرى ٠٫٨ (حرف V للسلك الصلب)، والضغط متوسط.'); } else ctx.asmMsg('bad', 'المس بكر التغذية جوه الماكينة (جنب البكرة).'); break;
     case 'torch':
       if (!a.picked) { if (id === 'plugT') { a.picked = true; ctx.asmMsg('info', 'المس وصلة اليورو.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', 'المس فيشة التورش (الكبيرة السودا).'); return; }
       if (id !== 'euro') return ctx.asmMsg('bad', 'التورش بيتوصل في وصلة اليورو (الوسط)، مش في أطراف الأرضي.');
-      a.picked = null; ctx.E.setHighlight([]); moveObj(ctx, plugT, sockW('euro'), new THREE.Euler(0, 0, 0), 1, () => { asm.torch = true; ctx.audio.click(); ctx.next('التورش اتوصّل واتربط. وصلة اليورو فيها التيار والغاز والسلك.'); });
+      a.picked = null; ctx.E.setHighlight([]); moveObj(ctx, plugT, sockW('euro'), new THREE.Euler(0, 0, 0), 1, () => { asm.torch = true; ctx.audio.sfx('clunk'); ctx.next('التورش اتوصّل واتربط. وصلة اليورو فيها التيار والغاز والسلك.'); });
       break;
     case 'ground':
       if (!a.picked) { if (id === 'plugG') { a.picked = true; ctx.asmMsg('info', 'المس الطرف المناسب.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', 'المس فيشة الأرضي.'); return; }
       if (id !== 'sockets') return ctx.asmMsg('bad', 'المس واحد من أطراف التوصيل.');
       if (r && r.object === m.sockets.plus) return ctx.asmMsg('bad', 'الأرضي على الموجب ده للسلك المتغلف ذاتي الحماية (FCAW). مع السلك الصلب والغاز الأرضي على السالب.');
-      a.picked = null; ctx.E.setHighlight([]); moveObj(ctx, plugG, sockW('minus'), new THREE.Euler(0, 0, 0), 1, () => { asm.ground = true; ctx.audio.click(); ctx.next('الأرضي على السالب، والتورش موجب (DCEP).'); });
+      a.picked = null; ctx.E.setHighlight([]); moveObj(ctx, plugG, sockW('minus'), new THREE.Euler(0, 0, 0), 1, () => { asm.ground = true; ctx.audio.sfx('clunk'); ctx.next('الأرضي على السالب، والتورش موجب (DCEP).'); });
       break;
     case 'clamp': if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1, () => { asm.clamp = true; updateCables(); ctx.next('ماسك الأرضي متثبّت.'); }); } else ctx.asmMsg('bad', 'المس ماسك الأرضي.'); break;
     case 'gas': if (id === 'cylinder' || id === 'flow') { ctx.E.setHighlight([]); moveObj(ctx, flow, outletW(cyl), new THREE.Euler(0, 0, 0), 1, () => { asm.gas = true; updateCables(); updateMachine(); ctx.next('العداد اتركّب وخرطوم الغاز اتوصّل لضهر الماكينة.'); }); } else ctx.asmMsg('bad', 'المس أسطوانة الغاز.'); break;
@@ -260,7 +283,8 @@ S.operateHTML = () => {
       <div class="lbl-row"><span>الجهد</span><b class="mono">${st.volt.toFixed(1)} V</b></div>
       <input type="range" min="12" max="30" step="0.5" value="${st.volt}" data-op="volt" aria-label="الجهد">
       <p class="muted small">مع السرعة دي الجهد المناسب حوالي <b class="mono">${iv.toFixed(1)} V</b>. اسمع صوت القوس: الصح بيبقى «طشطشة» منتظمة زي القلي.</p></section>
-    <section class="card"><div class="ph"><h3 class="sm">تصرّف الغاز</h3><span class="tag ${st.flowR >= 12 && st.flowR <= 16 ? 'ok' : 'low'}">${st.flowR} L/min</span></div>
+    <section class="card"><div class="ph"><h3 class="sm">تصرّف الغاز</h3><span class="tag ${st.flowR >= FLOW[0] && st.flowR <= FLOW[1] ? 'ok' : 'low'}">${st.flowR} L/min</span></div>
+      ${CO2 ? `<button type="button" class="btn ${st.heater ? 'on-green' : ''}" data-op="heater" style="width:100%;margin-bottom:.5rem">${st.heater ? ICON.check + 'سخّان المنظم شغال' : 'شغّل سخّان منظم CO₂'}</button>` : ''}
       <input type="range" min="0" max="25" step="1" value="${st.flowR}" data-op="flowR" aria-label="تصرف الغاز"></section>
     <section class="card"><h3 class="sm">قبل ما تبدأ</h3><div class="ppe">${ppe.map(([k, n]) => `<button type="button" class="${st.ppe[k] ? 'on' : ''}" data-op="ppe:${k}">${st.ppe[k] ? ICON.check : ICON.shield}${n}</button>`).join('')}</div></section>
     <button type="button" class="btn ${st.power ? 'on-green' : ''}" data-op="power">${ICON.bolt}${st.power ? 'الماكينة شغالة' : 'شغّل الماكينة'}</button>`;
@@ -271,19 +295,21 @@ S.operateAction = (op, el, ctx) => {
   else if (op.startsWith('th:')) st.thick = +op.slice(3);
   else if (op.startsWith('ppe:')) { const k = op.slice(4); st.ppe[k] = !st.ppe[k]; }
   else if (op === 'power') setPower(!st.power);
+  else if (op === 'heater') st.heater = !st.heater;
   ctx.audio.click(); updateMachine(); ctx.renderPanel();
 };
 S.operateReady = () => {
   if (!st.power) return { ok: false, label: 'شغّل الماكينة' };
   if (!['helmet', 'gloves', 'jacket', 'nozzle'].every(k => st.ppe[k])) return { ok: false, label: 'كمّل قائمة «قبل ما تبدأ»' };
   if (st.flowR < 4) return { ok: false, label: 'افتح الغاز' };
-  const wr = WFS_RANGE(st), ok = vStatus()[0] === 'ok' && st.wfs >= wr[0] && st.wfs <= wr[1] && st.flowR >= 12 && st.flowR <= 16;
+  if (CO2 && !st.heater) return { ok: false, label: 'شغّل سخّان منظم CO₂' };
+  const wr = WFS_RANGE(st), ok = vStatus()[0] === 'ok' && st.wfs >= wr[0] && st.wfs <= wr[1] && st.flowR >= FLOW[0] && st.flowR <= FLOW[1];
   return { ok: true, label: ok ? 'ابدأ اللحام' : 'ابدأ (الإعدادات مش متناسبة)' };
 };
 
 S.weldSettings = () => ({ ...st });
 S.weldProc = () => {
-  const wr = WFS_RANGE(st), dv = st.volt - idealV(st), gasOK = st.flowR >= 12 && st.flowR <= 16;
+  const wr = WFS_RANGE(st), dv = st.volt - idealV(st), gasOK = st.flowR >= FLOW[0] && st.flowR <= FLOW[1];
   const heat = THREE.MathUtils.clamp((st.wfs - wr[0]) / (wr[1] - wr[0]), -0.8, 1.8);
   return {
     kind: 'arc', distName: 'طول السلك البارز', angleName: 'زاوية التورش', settingName: 'الجهد والسرعة والغاز', angleShort: 'زاوية التورش',
@@ -300,16 +326,16 @@ S.weldProc = () => {
       const h = 2.6 * Math.pow(6 / sp, 0.5) * (1 - Math.max(0, dv) * 0.06) * (1 + Math.max(0, -dv) * 0.08);
       return { w: THREE.MathUtils.clamp(w, 4, 15), h: THREE.MathUtils.clamp(h, 0.8, 4.5), wobble: 0.6 + Math.abs(dv) * 0.3 };
     },
-    flags: s => ({ spatter: Math.min(0.9, Math.abs(dv) * 0.18 + (s.dist > 17 ? 0.3 : 0)), pore: (!gasOK ? 0.25 : 0) + (s.dist > 20 ? 0.2 : 0), undercut: (s.speed > 9.5 || dv > 2.5) ? 0.5 : 0 }),
+    flags: s => ({ spatter: Math.min(0.95, Math.abs(dv) * 0.18 + (s.dist > 17 ? 0.3 : 0) + (CO2 ? 0.22 : 0)), pore: (!gasOK ? 0.25 : 0) + (s.dist > 20 ? 0.2 : 0), undercut: (s.speed > 9.5 || dv > 2.5) ? 0.5 : 0 }),
     sparks: s => 60 + Math.abs(dv) * 70 + Math.max(0, s.dist - 15) * 20,
     poolMM: () => 7,
-    settingScore: set => ({ v: Math.max(15, 100 - Math.max(0, Math.abs(set.volt - idealV(set)) - 1.2) * 14 - pen(set.wfs, WFS_RANGE(set), 10) - pen(set.flowR, [12, 16], 6)), note: Math.abs(dv) > 1.2 ? `الجهد ${dv > 0 ? 'أعلى' : 'أقل'} من المناسب لسرعة السلك بحوالي ${Math.abs(dv).toFixed(1)} V.` : '' }),
+    settingScore: set => ({ v: Math.max(15, 100 - Math.max(0, Math.abs(set.volt - idealV(set)) - 1.2) * 14 - pen(set.wfs, WFS_RANGE(set), 10) - pen(set.flowR, FLOW, 6)), note: Math.abs(dv) > 1.2 ? `الجهد ${dv > 0 ? 'أعلى' : 'أقل'} من المناسب لسرعة السلك بحوالي ${Math.abs(dv).toFixed(1)} V.` : '' }),
     penetration: () => THREE.MathUtils.clamp(0.7 + heat * 0.3, 0.3, 1.3),
     defects: c => {
       const out = [];
       if (dv < -1.2) out.push({ name: 'تخبيط السلك وخط عالي', en: 'Stubbing / ropey bead', cause: 'الجهد قليل بالنسبة لسرعة السلك.', fix: 'زوّد الجهد أو قلّل سرعة السلك.' });
       if (dv > 1.2 || c.sim.spatter.count > 25) out.push({ name: 'رذاذ كتير', en: 'Excess spatter', cause: dv > 1.2 ? 'الجهد عالي (قوس طويل).' : 'السلك البارز طويل.', fix: 'اظبط الجهد على السرعة، وخلّي السلك البارز ١٠–١٥ مم.' });
-      if (!gasOK || c.sim.pores.count > 2) out.push({ name: 'مسامية', en: 'Porosity', cause: gasOK ? 'التورش بعيد عن الشغلانة فالغاز ماغطاش.' : 'تصرّف الغاز ' + st.flowR + ' لتر/دقيقة خارج المناسب.', fix: 'اضبط الغاز ١٢–١٦ لتر/دقيقة وقرّب التورش.' });
+      if (!gasOK || c.sim.pores.count > 2) out.push({ name: 'مسامية', en: 'Porosity', cause: gasOK ? 'التورش بعيد عن الشغلانة فالغاز ماغطاش.' : 'تصرّف الغاز ' + st.flowR + ' لتر/دقيقة خارج المناسب.', fix: 'اضبط الغاز ' + FLOW[0] + '–' + FLOW[1] + ' لتر/دقيقة وقرّب التورش.' });
       if (c.count('fast')) out.push({ name: 'تآكل الحواف / خط رفيع', en: 'Undercut', cause: 'سرعة تقدّم عالية.', fix: 'بطّأ الحركة.' });
       if (c.count('slow')) out.push({ name: 'تراكب', en: 'Overlap / cold lap', cause: 'الحركة بطيئة فالمعدن اتكوّم قدام القوس.', fix: 'زوّد السرعة وخلّي القوس على الحافة الأمامية للبركة.' });
       if (st.wfs < wr[0]) out.push({ name: 'نقص الاختراق', en: 'Lack of penetration', cause: 'سرعة السلك (التيار) قليلة على السُمك ده.', fix: 'زوّد سرعة السلك والجهد مع بعض.' });
@@ -354,4 +380,6 @@ S.weldPose = (ctx, tip) => {
 S.weldExit = () => { ap(torch, POSE.torchRest); setStickout(12); updateCables(); };
 S.inspectEnter = () => { ap(torch, POSE.torchRest); setStickout(12); updateCables(); };
 
-export default S;
+return S;
+}
+export default makeWire;

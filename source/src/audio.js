@@ -37,6 +37,21 @@ export class ArcAudio {
     this.hum.frequency.setTargetAtTime(hf, t, 0.02);
     this.bp.frequency.setTargetAtTime(f, t, 0.1); this.bp.Q.setTargetAtTime(q, t, 0.1);
   }
+  // short synthesized effects: ok, err, lift, place, chip, hiss, pop, clunk
+  sfx(name) {
+    if (!this.ctx || !this.enabled) return;
+    const c = this.ctx, t = c.currentTime, out = c.destination;
+    const tone = (f, d, type = 'sine', v = 0.08, f2) => { const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(out); o.start(t); o.stop(t + d + 0.02); };
+    const noise = (d, f, q, v) => { const n = c.createBufferSource(), b = c.createBuffer(1, Math.ceil(c.sampleRate * d), c.sampleRate), x = b.getChannelData(0); for (let i = 0; i < x.length; i++) x[i] = Math.random() * 2 - 1; n.buffer = b; const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; const g = c.createGain(); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d); n.connect(bp).connect(g).connect(out); n.start(t); };
+    if (name === 'ok') { tone(660, 0.12, 'sine', 0.07); setTimeout(() => this.ctx && tone(990, 0.16, 'sine', 0.06), 90); }
+    else if (name === 'err') tone(220, 0.25, 'square', 0.04, 160);
+    else if (name === 'lift') tone(300, 0.18, 'sine', 0.05, 520);
+    else if (name === 'place') { tone(420, 0.15, 'sine', 0.05, 220); noise(0.08, 900, 2, 0.12); }
+    else if (name === 'chip') noise(0.06, 3500, 3, 0.4);
+    else if (name === 'hiss') noise(0.7, 5000, 0.6, 0.25);
+    else if (name === 'pop') { noise(0.18, 300, 0.8, 0.9); tone(90, 0.2, 'sine', 0.2, 40); }
+    else if (name === 'clunk') { noise(0.06, 600, 1.5, 0.5); tone(140, 0.12, 'triangle', 0.12, 80); }
+  }
   click() {
     if (!this.ctx || !this.enabled) return;
     const o = this.ctx.createOscillator(), g = this.ctx.createGain();

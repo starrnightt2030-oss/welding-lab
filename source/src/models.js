@@ -72,7 +72,7 @@ export function buildRoom(scene) {
   bar.rotation.z = Math.PI / 2; bar.position.set(0.325, 1.88, -0.62); g.add(bar);
   [-0.5, 1.15].forEach(x => { const f = mesh(new THREE.BoxGeometry(0.06, 0.03, 0.5), frameMat); f.position.set(x, 0.015, -0.62); g.add(f); });
   const curtain = new THREE.Mesh(new THREE.PlaneGeometry(1.62, 1.68, 40, 1),
-    new THREE.MeshStandardMaterial({ color: 0xb8401a, roughness: 0.45, transparent: true, opacity: 0.78, side: THREE.DoubleSide }));
+    new THREE.MeshStandardMaterial({ color: 0x7a3216, roughness: 0.6, transparent: true, opacity: 0.88, side: THREE.DoubleSide }));
   const pos = curtain.geometry.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin(pos.getX(i) * 18) * 0.012);
   curtain.geometry.computeVertexNormals();

@@ -307,7 +307,7 @@ S.asmPick = (id, ctx) => {
         const isO = id === 'valveO';
         if (asm[isO ? 'crackO' : 'crackA']) return;
         asm[isO ? 'crackO' : 'crackA'] = true;
-        puffAt(outletWorld(isO ? cylO : cylA), ctx); ctx.audio.click();
+        puffAt(outletWorld(isO ? cylO : cylA), ctx); ctx.audio.sfx('hiss');
         if (asm.crackO && asm.crackA) ctx.next('اتنضّفوا الاتنين. لو في تراب في المخرج كان هيدخل المنظم ويبوّظه.');
         else { ctx.asmMsg('good', isO ? 'صمام الأكسجين اتنضّف. فاضل الأسيتيلين.' : 'صمام الأسيتيلين اتنضّف. فاضل الأكسجين.'); refresh(); }
       } else ctx.asmMsg('bad', 'المس صمام الأسطوانة نفسه (فوق خالص).');
@@ -429,14 +429,14 @@ S.operateAction = (op, el, ctx) => {
     clearTimeout(S._t); S._t = setTimeout(() => ctx.renderPanel(), 160); return;
   }
   if (op.startsWith('task:')) { setTask(op.slice(5)); S.enter(ctx); applyFlame(st.task === 'cut'); }
-  else if (op === 'valveO') { st.valveO = st.valveO ? 0 : 1; if (!st.valveO) st.pO = 0; ctx.audio.click(); }
-  else if (op === 'valveA') { st.valveA = st.valveA ? 0 : 1; if (!st.valveA) st.pA = 0; ctx.audio.click(); }
+  else if (op === 'valveO') { st.valveO = st.valveO ? 0 : 1; if (!st.valveO) st.pO = 0; ctx.audio.sfx('hiss'); }
+  else if (op === 'valveA') { st.valveA = st.valveA ? 0 : 1; if (!st.valveA) st.pA = 0; ctx.audio.sfx('hiss'); }
   else if (op === 'leak') { st.leak = true; say('good', 'رشيت مية بالصابون على كل الوصلات. مافيش فقاقيع؛ الوصلات سليمة.'); }
   else if (op === 'openA') { if (!(st.valveA && st.pA > 0)) say('bad', 'مافيش أسيتيلين واصل للبوري. افتح صمام الأسطوانة واضبط الضغط الأول.'); else { st.tA = 0.35; say('info', 'فتحت أسيتيلين البوري حوالي ربع لفة. ولّع فوراً بالولاعة.'); } }
   else if (op === 'light') {
     if (st.tO > 0 && !st.lit) say('bad', 'غلط وخطر! بنولّع الأسيتيلين لوحده الأول، مش والأكسجين مفتوح.');
     else if (!(st.tA > 0)) say('bad', 'افتح أسيتيلين البوري الأول وبعدين ولّع.');
-    else { st.lit = true; ctx.audio.click(); say('good', 'ولّعت! اللهب أصفر ودخّاني (أسيتيلين بس). زوّد الأكسجين بالتدريج.'); ctx.E.flyTo(V3(0.32, TABLE_Y + 0.32, 0.55), V3(0.15, TABLE_Y + 0.17, 0.2)); }
+    else { st.lit = true; ctx.audio.sfx('pop'); say('good', 'ولّعت! اللهب أصفر ودخّاني (أسيتيلين بس). زوّد الأكسجين بالتدريج.'); ctx.E.flyTo(V3(0.32, TABLE_Y + 0.32, 0.55), V3(0.15, TABLE_Y + 0.17, 0.2)); }
   }
   else if (op === 'openO') { if (!st.lit) say('bad', 'ماينفعش تفتح أكسجين البوري قبل الإشعال.'); else if (!(st.valveO && st.pO > 0)) say('bad', 'مافيش أكسجين واصل. افتح صمام الأسطوانة واضبط الضغط.'); else { st.tO = Math.max(st.tO, 0.2); say('info', 'دلوقتي زوّد الأكسجين من الشريط لحد ما الريشة البيضا تختفي.'); } }
   else if (op === 'off') { st.lit = false; st.tA = 0; st.tO = 0; say('info', 'اتطفى: قفلت الأسيتيلين الأول وبعدين الأكسجين.'); }

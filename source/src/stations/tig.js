@@ -204,7 +204,7 @@ S.asmPick = (id, ctx, r) => {
   const a = ctx.state.asm, s = S.asmSteps[a.step]; if (!s) return;
   if (st.power && s.id !== 'power' && id !== 'switch' && ['plugT', 'plugG'].includes(s.id)) return ctx.asmMsg('bad', 'اطفي الماكينة الأول قبل توصيل الكابلات.');
   switch (s.id) {
-    case 'power': if (id === 'switch') { setPower(false); ctx.audio.click(); ctx.next('الماكينة مطفية.'); } else ctx.asmMsg('bad', 'أول خطوة: اطفي الماكينة.'); break;
+    case 'power': if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة مطفية.'); } else ctx.asmMsg('bad', 'أول خطوة: اطفي الماكينة.'); break;
     case 'plugT': case 'plugG': {
       const isT = s.id === 'plugT', plug = isT ? plugT : plugG;
       if (!a.picked) { if (id === s.id) { a.picked = true; ctx.asmMsg('info', 'المس الطرف اللي هتوصّل فيه.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', isT ? 'المس فيشة كابل التورش الأول.' : 'المس فيشة كابل الأرضي.'); return; }
@@ -213,12 +213,12 @@ S.asmPick = (id, ctx, r) => {
       if (isT && which === 'plus') return ctx.asmMsg('bad', 'لأ! في TIG للصلب التورش على السالب (DCEN). لو على الموجب التنجستن هيسخن ويسيح.');
       if (!isT && which === 'minus') return ctx.asmMsg('bad', 'الطرف السالب عليه التورش. الأرضي على الموجب.');
       a.picked = null; ctx.E.setHighlight([]);
-      moveObj(ctx, plug, sockW(which), new THREE.Euler(0, 0, 0), 1, () => { asm[s.id] = true; ctx.audio.click(); ctx.next(isT ? 'التورش على السالب = DCEN. ٧٠٪ من الحرارة في الشغلانة.' : 'الأرضي على الموجب.'); });
+      moveObj(ctx, plug, sockW(which), new THREE.Euler(0, 0, 0), 1, () => { asm[s.id] = true; ctx.audio.sfx('clunk'); ctx.next(isT ? 'التورش على السالب = DCEN. ٧٠٪ من الحرارة في الشغلانة.' : 'الأرضي على الموجب.'); });
       break;
     }
     case 'clamp': if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1, () => { asm.clamp = true; updateCables(); ctx.next('ماسك الأرضي متثبّت.'); }); } else ctx.asmMsg('bad', 'المس ماسك الأرضي.'); break;
     case 'flow': if (id === 'cylinder' || id === 'flow') { ctx.E.setHighlight([]); moveObj(ctx, flow, outletW(cyl), new THREE.Euler(0, 0, 0), 1, () => { asm.flow = true; updateMachine(); ctx.next('نضّفت الصمام وركّبت العداد. عداد المحتوى بيقرا ضغط الأسطوانة.'); }); } else ctx.asmMsg('bad', 'المس أسطوانة الأرجون.'); break;
-    case 'hose': if (id === 'flow') { asm.hose = true; updateCables(); ctx.audio.click(); ctx.next('خرطوم الغاز اتوصّل لمدخل الغاز في ضهر الماكينة.'); } else ctx.asmMsg('bad', 'المس عداد الأرجون.'); break;
+    case 'hose': if (id === 'flow') { asm.hose = true; updateCables(); ctx.audio.sfx('clunk'); ctx.next('خرطوم الغاز اتوصّل لمدخل الغاز في ضهر الماكينة.'); } else ctx.asmMsg('bad', 'المس عداد الأرجون.'); break;
     case 'tung': if (id === 'tbox') { tung.visible = true; asm.tung = true; ctx.next('اخترت التنجستن الأحمر (٢٪ ثوريوم) للتيار المستمر، مبري سن قلم، وطالع ٤ مم من الفوهة.'); ctx.E.flyTo(V3(0.75, TABLE_Y + 0.12, 0.38), anc(torch, torch.userData.tipL)); } else ctx.asmMsg('bad', 'المس علبة التنجستن.'); break;
     case 'pedal': if (id === 'pedal' || id === 'ctrl') { asm.pedal = true; updateCables(); ctx.next('الدواسة اتوصّلت. المعدة جاهزة.'); } else ctx.asmMsg('bad', 'المس دواسة القدم.'); break;
   }

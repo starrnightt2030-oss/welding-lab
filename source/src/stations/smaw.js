@@ -132,7 +132,7 @@ S.asmPick = (id, ctx, r) => {
   if (st.power && step.id !== 'power' && id !== 'switch') return ctx.asmMsg('bad', 'خطر! الماكينة لسه شغالة. ماينفعش توصّل أي كابل والماكينة شغالة.');
   switch (step.id) {
     case 'power':
-      if (id === 'switch') { setPower(false); ctx.audio.click(); ctx.next('الماكينة اتطفت. كده آمن تبدأ التوصيل.'); }
+      if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة اتطفت. كده آمن تبدأ التوصيل.'); }
       else ctx.asmMsg('bad', 'استنى! أول خطوة دايماً إنك تطفي الماكينة قبل أي توصيل.');
       break;
     case 'holderPlug': case 'groundPlug': {
@@ -148,7 +148,7 @@ S.asmPick = (id, ctx, r) => {
       if (isH && which === 'minus') return ctx.asmMsg('bad', 'كده القطبية مباشرة (DCEN). في التمرين ده بنستخدم القطبية العكسية: الماسك على الموجب (+).');
       if (!isH && which === 'plus') return ctx.asmMsg('bad', 'الطرف الموجب عليه كابل الماسك خلاص. الأرضي بيروح للسالب (−).');
       a.picked = null; ctx.E.setHighlight([]);
-      moveObj(ctx, plug, m.socketWorld(which).add(V3(0, 0, 0.012)), new THREE.Euler(0, 0, 0), 1.0, () => { asm[isH ? 'plugH' : 'plugG'] = true; ctx.audio.click(); ctx.next(isH ? 'ممتاز! الماسك على الموجب = قطبية عكسية DCEP.' : 'تمام! كابل الأرضي على السالب، والدايرة قربت تكمل.'); });
+      moveObj(ctx, plug, m.socketWorld(which).add(V3(0, 0, 0.012)), new THREE.Euler(0, 0, 0), 1.0, () => { asm[isH ? 'plugH' : 'plugG'] = true; ctx.audio.sfx('clunk'); ctx.next(isH ? 'ممتاز! الماسك على الموجب = قطبية عكسية DCEP.' : 'تمام! كابل الأرضي على السالب، والدايرة قربت تكمل.'); });
       break;
     }
     case 'clamp':

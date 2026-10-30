@@ -1,7 +1,7 @@
 {
   "name": "معمل اللحام الافتراضي",
   "short_name": "معمل اللحام",
-  "description": "معمل لحام افتراضي ثلاثي الأبعاد لطلاب قسم اللحام بالمدارس الثانوية الصناعية",
+  "description": "معمل لحام افتراضي ثلاثي الأبعاد لطلاب قسم اللحام بالمدارس الثانوية الصناعية — Designed & developed by Mohamed-Eldawly",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "./index.html",

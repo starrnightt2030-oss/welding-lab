@@ -23,10 +23,11 @@ export function createEngine(viewport) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0c0e11);
-  scene.fog = new THREE.Fog(0x0c0e11, 4.5, 10);
+  scene.fog = new THREE.Fog(0x0c0e11, 6, 14);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.5;
+  scene.environmentIntensity = 0.75;
+  renderer.toneMappingExposure = 1.12;
 
   const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 30);
   camera.position.set(1.7, 1.6, 2.3);
@@ -45,11 +46,14 @@ export function createEngine(viewport) {
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
-  scene.add(new THREE.HemisphereLight(0xb8c7d9, 0x2e2620, 0.55));
+  scene.add(new THREE.HemisphereLight(0xc4d2e4, 0x2e2620, 0.7));
+  // rim light from behind: separates silhouettes from the background
+  const rim = new THREE.DirectionalLight(0xbcd6ff, 1.1); rim.position.set(-0.6, 2.4, -2.2); scene.add(rim);
+  const bounce = new THREE.DirectionalLight(0xffe2c4, 0.35); bounce.position.set(1.5, 0.3, 1.2); scene.add(bounce);
   const key = new THREE.SpotLight(0xfff0dc, 42, 9, 0.8, 0.65, 2);
   key.position.set(0.9, 2.8, 1.7); key.target.position.set(0.05, 0.5, 0);
   key.castShadow = true; key.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
-  key.shadow.bias = -0.0003; key.shadow.normalBias = 0.015; key.shadow.camera.near = 0.8; key.shadow.camera.far = 6;
+  key.shadow.bias = -0.0003; key.shadow.normalBias = 0.012; key.shadow.radius = 3; key.shadow.camera.near = 0.8; key.shadow.camera.far = 6;
   scene.add(key, key.target);
   const over = new THREE.SpotLight(0xffe7c4, 6, 4, 0.55, 0.8, 2);
   over.position.set(0.3, 2.2, 0.15); over.target.position.set(0.3, TABLE_Y, 0.05); scene.add(over, over.target);
@@ -129,6 +133,7 @@ export function createEngine(viewport) {
     hooks.forEach(f => f(dt, raw));
     controls.update();
     composer.render();
+    if (E.overlay && E.overlay.children.length > 4) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(E.overlay, camera); renderer.autoClear = true; }
     requestAnimationFrame(loop);
   };
 

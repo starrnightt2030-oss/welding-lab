@@ -2,10 +2,13 @@
 import * as THREE from 'three';
 import { createEngine, V3, ease } from './engine.js';
 import { WeldSim } from './weldsim.js';
-import { makeMaterials, buildRoom, buildTable, buildPlates, buildHammer, buildBrush, TABLE_Y, JOINT } from '../models.js';
+import { makeMaterials, buildRoom, buildTable, buildPlates, TABLE_Y, JOINT } from '../models.js';
 import { ArcAudio } from '../audio.js';
 import { AR } from '../data.js';
 import { ICON } from './icons.js';
+import { Voice } from './voice.js';
+import { HUB, INTRO } from '../voicescript.js';
+import { buildChippingHammer, buildWireBrush } from '../ppe.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const store = {
@@ -17,23 +20,27 @@ export function startApp(STATIONS) {
   const viewport = $('#viewport');
   const E = createEngine(viewport);
   const audio = new ArcAudio();
+  const voice = new Voice();
+  voice.enabled = store.get('voice', true);
+  voice.onMissing = () => showToast('info', 'الجهاز ده مافيهوش صوت عربي للشرح. على ويندوز افتح المعمل من متصفح Edge، وعلى الموبايل نزّل الصوت العربي من إعدادات تحويل النص إلى كلام.', true);
   const state = {
     station: null, stage: 'hub', done: store.get('done2', {}),
     explore: { sel: 0, labels: false, exploded: false },
     asm: { step: 0, picked: null, msg: null },
     lens: true, assist: true, angle: 72, sound: true, control: E.isMobile ? 'rel' : 'direct',
     weld: { pressing: false, x: JOINT.x0, dist: 20, aux: false },
-    report: null, showDef: false, drawer: true, op: {}
+    report: null, showDef: false, drawer: true, op: {}, voice: voice.enabled
   };
-  let M, sim, plates, hammer, brush, platesOpts = '';
+  let M, sim, plates, hammer, brush, platesOpts = '', booted = false;
   const shared = {};
 
   const ctx = {
     E, THREE, state, audio, store, AR, V3, ease, $, get M() { return M; }, get sim() { return sim; }, shared,
     toast: (t, s) => showToast(t, s), renderPanel: () => renderPanel(), renderHUD: () => renderHUD(),
-    asmMsg: (t, s) => { state.asm.msg = { t, s }; renderPanel(); },
+    asmMsg: (t, s) => { state.asm.msg = { t, s }; renderPanel(); if (t === 'bad') audio.sfx('err'); voice.say(s); },
     next: msg => asmNext(msg), markDone: k => markDone(k),
-    setPlates: opts => setPlates(opts), joint: JOINT, TABLE_Y
+    setPlates: opts => setPlates(opts), joint: JOINT, TABLE_Y,
+    say: (t, kind) => voice.say(t, kind === 'low' ? 'low' : 'normal'), voice
   };
 
   // ---------------------------------------------------------------- build
@@ -42,8 +49,9 @@ export function startApp(STATIONS) {
     M = makeMaterials();
     buildRoom(E.scene);
     E.scene.add(buildTable(M));
-    hammer = buildHammer(M); hammer.position.set(0.68, TABLE_Y + 0.012, -0.15); hammer.rotation.set(Math.PI / 2, 0.5, 0.4); E.scene.add(hammer);
-    brush = buildBrush(M); brush.position.set(0.05, TABLE_Y, -0.18); brush.rotation.y = -0.3; E.scene.add(brush);
+    hammer = buildChippingHammer(); hammer.position.set(0.7, TABLE_Y, -0.17); hammer.rotation.y = 0.5; E.scene.add(hammer);
+    brush = buildWireBrush(); brush.position.set(0.02, TABLE_Y, -0.2); brush.rotation.y = -0.3; E.scene.add(brush);
+    hammer.traverse(o => { if (o.isMesh) o.castShadow = true; });
     hammer.userData.pick = 'hammer'; brush.userData.pick = 'brush';
     shared.hammer = hammer; shared.brush = brush;
     setPlates({ t: 0.006, kind: 'butt' });
@@ -88,13 +96,15 @@ export function startApp(STATIONS) {
     E.setHighlight([]);
     renderAll();
     E.flyTo(V3(1.75, 1.55, 2.25), V3(0.1, 0.55, 0), 1.2);
+    if (booted) voice.say(HUB);
   }
   function leaveStage() {
     const s = S(), prev = state.stage;
-    if (prev === 'weld') { audio.update(false); $('#lens').classList.remove('on'); E.renderer.toneMappingExposure = 1; sim.setVisible(false); s && s.weldExit && s.weldExit(ctx); }
+    if (prev === 'weld') { audio.update(false); $('#lens').classList.remove('on'); E.renderer.toneMappingExposure = 1.12; sim.setVisible(false); s && s.weldExit && s.weldExit(ctx); }
     if (prev === 'explore' && explodeK > 0) resetExplode();
     if (assist) { assist.visible = false; assist.userData.ring.visible = false; }
     $('#coach').classList.remove('on');
+    if (hold) releaseHold(true);
     showDefects(false);
   }
   function goStage(st) {
@@ -125,7 +135,12 @@ export function startApp(STATIONS) {
     E.resize();
     const cam = st === 'weld' ? weldCamera() : st === 'inspect' ? inspectCamera() : s.cams[st]();
     E.flyTo(cam.pos, cam.target, prev === st ? 0.01 : 1.2);
+    const intro = INTRO[s.id] && INTRO[s.id][st];
+    if (st === 'assemble') voice.say((intro ? intro + ' ' : '') + stepSpeech());
+    else if (st === 'inspect' && state.report && !state.report.empty) voice.say('درجتك ' + state.report.total + ' من مية. التقدير ' + state.report.grade + '. ' + (state.report.defects.length ? 'العيوب اللي ظهرت: ' + state.report.defects.map(d => d.name).join('، ') + '.' : 'مافيش عيوب واضحة، شغل نضيف.'));
+    else if (intro) voice.say(intro);
   }
+  function stepSpeech() { const s = S(), x = s.asmSteps && s.asmSteps[state.asm.step]; return x ? 'الخطوة ' + (state.asm.step + 1) + ': ' + x.title + '. ' + x.hint : 'خلّصت التركيب. دوس التالي.'; }
   // keep the 3D subject centred in the free area beside the open drawer
   function applyViewOffset() {
     const w = viewport.clientWidth, h = viewport.clientHeight, dr = $('#drawer');
@@ -145,9 +160,12 @@ export function startApp(STATIONS) {
   function inspectCamera() { return { pos: V3(0.3, JOINT.y + 0.24, 0.2), target: V3(0.3, JOINT.y, 0.05) }; }
 
   // ---------------------------------------------------------------- explore
-  function selectPart(i, fly) {
+  function partSpeech(p) { return p.name + '. ' + p.desc + (p.facts && p.facts.length ? ' ' + p.facts.join(' ') : '') + (p.safety ? ' تحذير: ' + p.safety : ''); }
+  function selectPart(i, fly, speak = fly) {
     const s = S(); state.explore.sel = i;
     const p = s.parts[i];
+    if (speak) voice.say(partSpeech(p));
+    if (fly && canHold(p.id)) { renderPanel(); holdPart(s.partObject(p.id)); return; }
     E.setHighlight(s.partHighlight ? s.partHighlight(p.id) : [s.partObject(p.id)]);
     if (fly) {
       const a = s.partAnchor(p.id);
@@ -197,13 +215,108 @@ export function startApp(STATIONS) {
     });
   }
 
+
+  // ---------------------------------------------------------------- hold & inspect (pick up a tool, turn it, put it back)
+  const DEFAULT_HOLD = ['hammer', 'brush', 'holder', 'electrode', 'clamp', 'torch', 'lighter', 'goggles', 'rods', 'regO', 'regA', 'flow', 'spool', 'twin', 'gouge', 'carbon', 'tungsten', 'pedal', 'cutter'];
+  function canHold(id) { const s = S(); return s && state.stage === 'explore' && (s.holdable ? s.holdable(id) : DEFAULT_HOLD.includes(id)) && !!(s.partObject && s.partObject(id) || id === 'hammer' || id === 'brush'); }
+  let hold = null;
+  const holdScene = new THREE.Scene();
+  holdScene.environment = E.scene.environment;
+  holdScene.add(new THREE.HemisphereLight(0xdfe8f5, 0x3a3028, 1.1));
+  const hKey = new THREE.DirectionalLight(0xfff2e0, 2.4); hKey.position.set(1, 2, 2); holdScene.add(hKey);
+  const hRim = new THREE.DirectionalLight(0x9cc4ff, 1.4); hRim.position.set(-2, 1, -2); holdScene.add(hRim);
+  const dim = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x07090c, transparent: true, opacity: 0, depthTest: false, depthWrite: false }));
+  dim.renderOrder = -10; holdScene.add(dim);
+  E.overlay = holdScene;
+  function holdPart(obj) {
+    if (!obj || !obj.isObject3D) return;
+    if (hold) { if (hold.obj === obj) return; releaseHold(true); }
+    E.setHighlight([]);
+    obj.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(obj), center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+    const pivot = new THREE.Group(); pivot.position.copy(center);
+    const clone = obj.clone(true);
+    obj.matrixWorld.decompose(clone.position, clone.quaternion, clone.scale);
+    clone.position.sub(center);
+    pivot.add(clone); holdScene.add(pivot);
+    obj.visible = false;
+    const cam = E.camera, dir = new THREE.Vector3(); cam.getWorldDirection(dir);
+    const dist = 0.5, fitH = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * dist * 0.62;
+    const sc = fitH / Math.max(size.x, size.y, size.z, 0.02);
+    hold = { obj, pivot, center, size, dist, scale: sc, zoom: 1, spin: true, idle: 0, vx: 0, vy: 0, ptrs: new Map(), ready: false };
+    const p0 = center.clone(), q0 = new THREE.Quaternion(), target = () => cam.position.clone().addScaledVector(dir, dist);
+    const qT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.6).premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.25));
+    E.controls.enabled = false;
+    audio.sfx('lift');
+    E.tween(0.75, k => {
+      const e = ease(k);
+      pivot.position.lerpVectors(p0, target(), e); pivot.position.y += Math.sin(Math.PI * e) * 0.06;
+      pivot.scale.setScalar(1 + (sc - 1) * e); pivot.quaternion.slerpQuaternions(q0, qT, e);
+      dim.material.opacity = 0.62 * e;
+    }, () => { hold && (hold.ready = true); });
+    renderHoldUI();
+  }
+  function releaseHold(instant) {
+    if (!hold) return;
+    const h = hold; hold = null;
+    const finish = () => { holdScene.remove(h.pivot); h.obj.visible = true; dim.material.opacity = 0; if (state.stage !== 'weld') E.controls.enabled = true; };
+    renderHoldUI();
+    if (instant) return finish();
+    audio.sfx('place');
+    const p0 = h.pivot.position.clone(), q0 = h.pivot.quaternion.clone(), s0 = h.pivot.scale.x, qI = new THREE.Quaternion();
+    E.tween(0.7, k => {
+      const e = ease(k);
+      h.pivot.position.lerpVectors(p0, h.center, e); h.pivot.position.y += Math.sin(Math.PI * e) * 0.05;
+      h.pivot.quaternion.slerpQuaternions(q0, qI, e); h.pivot.scale.setScalar(s0 + (1 - s0) * e);
+      dim.material.opacity = 0.62 * (1 - e);
+    }, finish);
+  }
+  function holdPointer(ev, phase) {
+    const h = hold; if (!h) return;
+    if (phase === 'down') { cv.setPointerCapture(ev.pointerId); h.ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY }); h.idle = 0; h.pinch = null; return; }
+    const prev = h.ptrs.get(ev.pointerId); if (!prev) return;
+    if (phase === 'up') { h.ptrs.delete(ev.pointerId); h.pinch = null; return; }
+    if (h.ptrs.size >= 2) {
+      h.ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      const [a, b] = [...h.ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (h.pinch) h.zoom = THREE.MathUtils.clamp(h.zoom * d / h.pinch, 0.55, 2.2);
+      h.pinch = d; return;
+    }
+    const dx = ev.clientX - prev.x, dy = ev.clientY - prev.y;
+    h.ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    rotateHold(dx * 0.011, dy * 0.011); h.vx = dx * 0.011; h.vy = dy * 0.011; h.idle = 0; h.spin = false;
+  }
+  const _axY = new THREE.Vector3(0, 1, 0), _axR = new THREE.Vector3();
+  function rotateHold(ax, ay) { _axR.setFromMatrixColumn(E.camera.matrixWorld, 0); hold.pivot.rotateOnWorldAxis(_axY, ax); hold.pivot.rotateOnWorldAxis(_axR, ay); }
+  function holdFrame(dt) {
+    const h = hold; if (!h) return;
+    const cam = E.camera, dir = new THREE.Vector3(); cam.getWorldDirection(dir);
+    // keep a dark backdrop between the room and the held tool
+    dim.position.copy(cam.position).addScaledVector(dir, 0.15); dim.quaternion.copy(cam.quaternion); dim.scale.setScalar(2);
+    if (!h.ready) return;
+    h.pivot.position.copy(cam.position).addScaledVector(dir, h.dist);
+    h.pivot.scale.setScalar(h.scale * h.zoom);
+    if (!h.ptrs.size) {
+      h.idle += dt;
+      if (Math.abs(h.vx) + Math.abs(h.vy) > 0.0005) { rotateHold(h.vx, h.vy); h.vx *= 0.92; h.vy *= 0.92; }
+      else if (h.spin || h.idle > 2.5) { h.spin = true; h.pivot.rotateOnWorldAxis(_axY, dt * 0.55); }
+    }
+  }
+  function renderHoldUI() {
+    const el = $('#hold-ui'); if (!el) return;
+    el.hidden = !hold;
+    if (hold) { const s = S(), p = s && s.parts && s.parts[state.explore.sel]; $('#hold-name').textContent = p ? p.name : ''; }
+  }
+
   // ---------------------------------------------------------------- assemble
   function highlightAsm() { const s = S(); E.setHighlight(s.asmTargets(state.asm.step, ctx)); renderPanel(); }
   function asmNext(msg) {
     const s = S();
     state.asm.step++; state.asm.picked = null; state.asm.msg = { t: 'good', s: msg };
     if (state.asm.step >= s.asmSteps.length) markDone('assemble');
+    audio.sfx('ok');
     highlightAsm();
+    voice.say(msg + ' ' + stepSpeech());
   }
 
   // ---------------------------------------------------------------- picking / pointer
@@ -211,11 +324,14 @@ export function startApp(STATIONS) {
   const cv = E.renderer.domElement;
   cv.addEventListener('pointerdown', ev => {
     audio.ensure(); tryLandscape();
+    if (hold) { holdPointer(ev, 'down'); return; }
     downAt = { x: ev.clientX, y: ev.clientY };
     if (state.stage === 'weld') { cv.setPointerCapture(ev.pointerId); weldPointer(ev, 'down'); }
   });
-  cv.addEventListener('pointermove', ev => { if (state.stage === 'weld' && state.weld.pressing) weldPointer(ev, 'move'); });
+  cv.addEventListener('pointermove', ev => { if (hold) { holdPointer(ev, 'move'); return; } if (state.stage === 'weld' && state.weld.pressing) weldPointer(ev, 'move'); });
+  cv.addEventListener('wheel', ev => { if (hold) { ev.preventDefault(); hold.zoom = THREE.MathUtils.clamp(hold.zoom * (ev.deltaY > 0 ? 0.92 : 1.08), 0.55, 2.2); } }, { passive: false });
   const up = ev => {
+    if (hold) { holdPointer(ev, 'up'); return; }
     if (state.stage === 'weld') { if (state.weld.pid === ev.pointerId) { state.weld.pressing = false; state.weld.rel = null; } return; }
     if (!downAt) return;
     const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y); downAt = null;
@@ -231,6 +347,7 @@ export function startApp(STATIONS) {
       const pid = (s.exploreMap && s.exploreMap[id]) || id;
       const i = s.parts.findIndex(p => p.id === pid);
       if (i >= 0) selectPart(i, true);
+      else if (canHold(id)) holdPart(r.object);
     } else if (state.stage === 'assemble') { if (!state.asm.busy) s.asmPick(id, ctx, r); }
     else if (state.stage === 'operate') { s.operatePick && s.operatePick(id, ctx, r); }
     else if (s.custom && s.custom[state.stage] && s.custom[state.stage].pick) s.custom[state.stage].pick(id, ctx, r);
@@ -289,7 +406,7 @@ export function startApp(STATIONS) {
     const lensOn = state.lens && sim.on && sim.proc.lens !== false;
     $('#lens').classList.toggle('on', lensOn);
     $('#lens').dataset.shade = sim.proc.lensShade || 'arc';
-    E.renderer.toneMappingExposure = THREE.MathUtils.lerp(E.renderer.toneMappingExposure, lensOn ? (sim.proc.lensExposure ?? 0.28) : 1, 1 - Math.pow(0.001, dt));
+    E.renderer.toneMappingExposure = THREE.MathUtils.lerp(E.renderer.toneMappingExposure, lensOn ? (sim.proc.lensExposure ?? 0.28) : 1.12, 1 - Math.pow(0.001, dt));
     updateHUD(out);
     if (out.progress >= 0.999 && !sim.on && !w.done) { w.done = true; showToast('good', 'خلّصت! دوس «افحص» عشان تشوف النتيجة.'); }
   }
@@ -345,6 +462,7 @@ export function startApp(STATIONS) {
       }).join('');
     }
     $('#tb-sound').innerHTML = state.sound ? ICON.sound : ICON.mute;
+    $('#tb-voice').classList.toggle('on', state.voice);
     $('#drawer-toggle').hidden = st === 'weld';
     document.body.classList.toggle('drawer-closed', !state.drawer);
   }
@@ -368,6 +486,10 @@ export function startApp(STATIONS) {
         <p>${p.desc}</p>
         ${p.facts && p.facts.length ? `<ul class="facts">${p.facts.map(f => `<li>${f}</li>`).join('')}</ul>` : ''}
         ${p.safety ? `<div class="safety">${ICON.shield}<div><b>سلامة</b><span>${p.safety}</span></div></div>` : ''}
+        <div class="row2" style="margin-top:.8rem">
+          <button type="button" class="btn" data-act="speak-part">${ICON.sound}اسمع الشرح</button>
+          ${canHold(p.id) ? `<button type="button" class="btn" data-act="hold-part">${ICON.hand}امسكه وقلّبه</button>` : `<button type="button" class="btn" data-act="cam-part">${ICON.eye}قرّب عليه</button>`}
+        </div>
       </article>
       <div class="row2">
         <button type="button" class="btn ${state.explore.labels ? 'on' : ''}" data-act="labels">${ICON.list}الأسماء</button>
@@ -493,7 +615,7 @@ export function startApp(STATIONS) {
     const far = val != null && lo != null && (val < lo - (hi - lo) * 0.8 || val > hi + (hi - lo) * 0.8);
     g.dataset.s = far ? 'bad' : st;
   }
-  let hudT = 0;
+  let hudT = 0, lastTip = '', lastTipT = 0;
   function updateHUD(out) {
     if ((hudT += 1) % 3) return;
     const s = S(), proc = sim.proc, w = state.weld;
@@ -503,11 +625,12 @@ export function startApp(STATIONS) {
     const hi = $('#heat-i'); if (hi) { const k = THREE.MathUtils.clamp(out.heat || 0, 0, 1.2); hi.style.width = Math.min(100, k * 100) + '%'; hi.dataset.ok = k >= 1 ? '1' : ''; $('#heat-v').textContent = k >= 1 ? 'جاهز' : Math.round(k * 100) + '%'; }
     const coach = $('#coach');
     const tip = sim.on ? s.coach(ctx, out) : (out.preheat != null ? null : null);
-    if (tip) { coach.textContent = tip; coach.classList.add('on'); } else coach.classList.remove('on');
+    if (tip) { coach.textContent = tip; coach.classList.add('on'); if (tip !== lastTip || performance.now() - lastTipT > 6000) { voice.say(tip, 'low'); lastTip = tip; lastTipT = performance.now(); } } else coach.classList.remove('on');
   }
 
   let toastTimer;
-  function showToast(t, s) {
+  function showToast(t, s, silent) {
+    if (!silent) { voice.say(s); if (t === 'bad') audio.sfx('err'); }
     const el = $('#toast');
     el.className = 'toast on ' + t; el.innerHTML = (t === 'bad' ? ICON.x : t === 'good' ? ICON.check : ICON.info) + `<span>${s}</span>`;
     clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 4200);
@@ -547,10 +670,17 @@ export function startApp(STATIONS) {
     else if (a === 'assist') { state.assist = !state.assist; setAssist(state.assist); renderHUD(); }
     else if (a === 'new-consumable') { sim.consumable = sim.proc.consumable.len; showToast('info', sim.proc.consumable.newMsg); }
     else if (a === 'finish') finishWeld();
-    else if (a === 'slag') { if (sim.startSlagRemoval()) showToast('info', 'بتخبّط الخبث بالشاكوش…'); }
+    else if (a === 'slag') { if (sim.startSlagRemoval()) { showToast('info', 'بتخبّط الخبث بالشاكوش…'); [0, 180, 360, 540, 720, 900].forEach(d => setTimeout(() => audio.sfx('chip'), d)); } }
     else if (a === 'defects') { state.showDef = !state.showDef; showDefects(state.showDef); renderPanel(); }
     else if (a === 'finish-station') goHub();
     else if (a === 'sound') { state.sound = audio.enabled = !state.sound; renderTopbar(); }
+    else if (a === 'voice') { state.voice = voice.enabled = !state.voice; store.set('voice', state.voice); if (!state.voice) voice.stop(); else voice.say('الشرح الصوتي اشتغل.'); renderTopbar(); }
+    else if (a === 'speak-part') { const p = s.parts[state.explore.sel]; voice.lastT = 0; voice.say(partSpeech(p)); }
+    else if (a === 'hold-part') { holdPart(s.partObject(s.parts[state.explore.sel].id)); }
+    else if (a === 'cam-part') selectPart(state.explore.sel, true, false);
+    else if (a === 'hold-return') releaseHold(false);
+    else if (a === 'hold-spin') { if (hold) { hold.spin = !hold.spin; hold.idle = 0; } }
+    else if (a === 'hold-reset') { if (hold) { hold.pivot.quaternion.identity(); hold.zoom = 1; hold.vx = hold.vy = 0; } }
     else if (a === 'full') toggleFull();
     else if (a === 'present') { document.documentElement.classList.toggle('present'); setTimeout(E.resize, 50); }
     else if (a === 'home') goHub();
@@ -576,6 +706,7 @@ export function startApp(STATIONS) {
 
   // ---------------------------------------------------------------- loop & boot
   E.onFrame(dt => {
+    holdFrame(dt);
     const s = S();
     if (state.stage === 'weld') weldFrame(dt);
     else if (sim) { sim.time += dt; if (state.stage === 'inspect') sim.updateSlag(dt); sim.updateRipples(); sim.updateSparks(dt); sim.updateSmoke(dt); }
@@ -588,6 +719,7 @@ export function startApp(STATIONS) {
       await build();
       state.station = 'smaw';
       goHub();
+      booted = true;
       E.start();
       $('#loading').classList.add('done');
     } catch (e) {

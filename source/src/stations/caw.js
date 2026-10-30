@@ -1,7 +1,9 @@
 // Station: Carbon Arc Welding (اللحام بقوس الكربون)
 import * as THREE from 'three';
-import { buildMachine, buildHolder, buildClamp, buildPlug, Cable, TABLE_Y, JOINT } from '../models.js';
+import { buildHolder, buildClamp, buildPlug, Cable, TABLE_Y, JOINT } from '../models.js';
 import { orientTool, mesh } from '../gasparts.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { Textures } from '../textures.js';
 import { PPE } from '../data.js';
 import { ICON } from '../core/icons.js';
 
@@ -11,8 +13,8 @@ const S = {
   stages: [['explore', 'اتعرّف'], ['assemble', 'ركّب'], ['operate', 'شغّل'], ['weld', 'الحم'], ['inspect', 'افحص']]
 };
 S.parts = [
-  { id: 'machine', name: 'ماكينة اللحام (تيار مستمر)', en: 'DC power source', far: 0.95,
-    desc: 'نفس ماكينة القوس الكهربي، بس القوس هنا بيتولد بين قطب كربون (جرافيت) والشغلانة، والقطب مابيدوبش زي القطب المعدني.',
+  { id: 'machine', name: 'مقوّم التيار المستمر', en: 'DC transformer–rectifier', far: 1.1,
+    desc: 'ماكينة تقيلة فيها محوّل ومقوّم بيطلّعوا تيار مستمر ثابت. التيار بيتظبط بطارة اليد، والعدّاد بالإبرة بيبيّن الأمبير. القوس بيتولد بين قطب كربون (جرافيت) والشغلانة، والقطب مابيدوبش.',
     facts: ['القطب الكربون بيتوصل على السالب (DCEN) عشان يستهلك أبطأ ومايدخّلش كربون في المعدن.'], safety: 'قوس الكربون أشد إضاءة؛ استخدم عدسة ١٢ على الأقل.' },
   { id: 'sockets', name: 'أطراف التوصيل', en: 'Output terminals', far: 0.45, desc: 'الماسك على السالب والأرضي على الموجب.', facts: ['لو اتعكست القطبية، الكربون بيسخن جداً ويستهلك بسرعة ويتلوّث المعدن بالكربون.'], safety: '' },
   { id: 'holder', name: 'ماسك قطب الكربون', en: 'Carbon electrode holder', far: 0.5,
@@ -54,10 +56,80 @@ function buildCarbon(M) {
   return g;
 }
 
+
+// Heavy DC rectifier (transformer–rectifier) — visually distinct from the inverter used in SMAW.
+function buildRectifier(M) {
+  const root = new THREE.Group(); root.position.set(-0.66, 0, 0.0);
+  const W = 0.42, H = 0.72, D = 0.52, Y = 0.07;
+  const body = new THREE.Group(); body.position.y = Y + H / 2; root.add(body);
+  const paint = new THREE.MeshPhysicalMaterial({ color: 0x3f5a4a, roughness: 0.55, metalness: 0.35, clearcoat: 0.25, bumpMap: Textures.paint().bumpMap, bumpScale: 0.7 });
+  body.add(mesh(new RoundedBoxGeometry(W, H, D, 3, 0.012), paint));
+  // louvers on both sides and top lifting eyes
+  const louv = new THREE.MeshStandardMaterial({ color: 0x1b2620, roughness: 0.8 });
+  for (let i = 0; i < 12; i++) [1, -1].forEach(sd => { const l = mesh(new THREE.BoxGeometry(0.006, 0.012, D * 0.6), louv, false); l.position.set(sd * (W / 2 + 0.002), H * 0.32 - i * 0.04, 0); l.rotation.z = sd * 0.5; body.add(l); });
+  [-1, 1].forEach(sd => { const e = mesh(new THREE.TorusGeometry(0.025, 0.007, 8, 20), M.steel); e.position.set(sd * 0.12, H / 2 + 0.025, 0); body.add(e); });
+  // front panel
+  const fz = D / 2 + 0.002;
+  const panel = mesh(new THREE.BoxGeometry(W - 0.06, H * 0.55, 0.006), new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.6 })); panel.position.set(0, H * 0.12, fz); body.add(panel);
+  const plate = Textures.label((c, w, h) => {
+    c.fillStyle = '#d8d4c8'; c.fillRect(0, 0, w, h); c.fillStyle = '#1b2620'; c.textAlign = 'center';
+    c.font = '700 34px "IBM Plex Mono", monospace'; c.fillText('DC RECTIFIER 250', w / 2, 46);
+    c.font = '600 24px "IBM Plex Sans Arabic", sans-serif'; c.fillText('مقوّم تيار مستمر', w / 2, 82);
+    c.font = '600 22px "IBM Plex Sans Arabic", sans-serif'; c.fillText('ضبط التيار', w * 0.72, h - 40); c.fillText('تشغيل', w * 0.24, h - 40);
+  }, 512, 400);
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.06, H * 0.55), new THREE.MeshStandardMaterial({ map: plate, roughness: 0.6 })); pl.position.set(0, H * 0.12, fz + 0.0035); body.add(pl);
+  // analog ammeter
+  const gC = document.createElement('canvas'); gC.width = gC.height = 256; const gT = new THREE.CanvasTexture(gC); gT.colorSpace = THREE.SRGBColorSpace;
+  const gx = gC.getContext('2d'); gx.fillStyle = '#f6f3ea'; gx.fillRect(0, 0, 256, 256); gx.strokeStyle = '#1b1d21'; gx.fillStyle = '#1b1d21'; gx.textAlign = 'center';
+  for (let i = 0; i <= 10; i++) { const a = Math.PI * (1.15 + i * 0.07); gx.lineWidth = i % 2 ? 2 : 4; gx.beginPath(); gx.moveTo(128 + Math.cos(a) * 110, 200 + Math.sin(a) * 110); gx.lineTo(128 + Math.cos(a) * (i % 2 ? 98 : 92), 200 + Math.sin(a) * (i % 2 ? 98 : 92)); gx.stroke(); if (!(i % 2)) { gx.font = '600 20px "IBM Plex Mono", monospace'; gx.fillText(String(i * 25), 128 + Math.cos(a) * 76, 206 + Math.sin(a) * 76); } }
+  gx.font = '700 26px "IBM Plex Mono", monospace'; gx.fillText('A', 128, 175);
+  const face = mesh(new THREE.BoxGeometry(0.13, 0.1, 0.008), [M.blackPlastic, M.blackPlastic, M.blackPlastic, M.blackPlastic, new THREE.MeshStandardMaterial({ map: gT, roughness: 0.3 }), M.blackPlastic]);
+  face.position.set(0, H * 0.24, fz + 0.006); body.add(face);
+  const bezel = mesh(new THREE.BoxGeometry(0.14, 0.11, 0.004), M.blackPlastic); bezel.position.set(0, H * 0.24, fz + 0.003); body.add(bezel);
+  const needle = new THREE.Group(); needle.position.set(0, H * 0.24 - 0.028, fz + 0.011);
+  const nd = mesh(new THREE.BoxGeometry(0.0015, 0.05, 0.001), new THREE.MeshStandardMaterial({ color: 0xc0261a }), false, false); nd.position.y = 0.025; needle.add(nd); body.add(needle);
+  // handwheel for current (front, right)
+  const knob = new THREE.Group(); knob.position.set(0.1, H * 0.02, fz + 0.03);
+  const wheel = mesh(new THREE.TorusGeometry(0.05, 0.007, 10, 36), M.darkSteel); knob.add(wheel);
+  for (let i = 0; i < 3; i++) { const sp = mesh(new THREE.BoxGeometry(0.1, 0.007, 0.007), M.darkSteel); sp.rotation.z = i * Math.PI / 3; knob.add(sp); }
+  const hub = mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.03, 16), M.darkSteel); hub.rotation.x = Math.PI / 2; knob.add(hub);
+  const grip = mesh(new THREE.CylinderGeometry(0.007, 0.008, 0.04, 12), M.blackPlastic); grip.rotation.x = Math.PI / 2; grip.position.set(0.045, 0.0, 0.02); knob.add(grip);
+  body.add(knob);
+  // rotary power switch (left) + pilot lamp
+  const sw = new THREE.Group(); sw.position.set(-0.1, H * 0.02, fz + 0.012);
+  const swBase = mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.01, 24), M.blackPlastic); swBase.rotation.x = Math.PI / 2; sw.add(swBase);
+  const rocker = mesh(new RoundedBoxGeometry(0.05, 0.014, 0.018, 2, 0.004), new THREE.MeshPhysicalMaterial({ color: 0x8a1d18, roughness: 0.35, clearcoat: 0.5 })); rocker.position.z = 0.012; sw.add(rocker);
+  sw.userData.rocker = { rotation: { set x(v) { rocker.rotation.z = v > 0 ? -0.8 : 0.8; } } };
+  body.add(sw);
+  const ledG = mesh(new THREE.SphereGeometry(0.008, 14, 10), M.ledGreenOff); ledG.position.set(-0.1, H * 0.1, fz + 0.006); body.add(ledG);
+  // heavy stud terminals at the bottom
+  const sockets = {};
+  [['plus', -0.09, true], ['minus', 0.09, false]].forEach(([k, x, red]) => {
+    const t = new THREE.Group(); t.position.set(x, -H * 0.36, fz + 0.01);
+    const ins = mesh(new THREE.CylinderGeometry(0.03, 0.032, 0.02, 24), red ? M.redPlastic : M.blackPlastic); ins.rotation.x = Math.PI / 2; t.add(ins);
+    const stud = mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.04, 12), M.brass); stud.rotation.x = Math.PI / 2; stud.position.z = 0.015; t.add(stud);
+    const nut = mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.01, 6), M.brass); nut.rotation.x = Math.PI / 2; nut.position.z = 0.03; t.add(nut);
+    body.add(t); sockets[k] = t;
+  });
+  const lbl = Textures.label((c, w, h) => { c.clearRect(0, 0, w, h); c.font = '700 80px "IBM Plex Mono", monospace'; c.textAlign = 'center'; c.fillStyle = '#c0261a'; c.fillText('+', 64, 100); c.fillStyle = '#1b1d21'; c.fillText('−', 192, 100); }, 256, 128);
+  const tl = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.1), new THREE.MeshBasicMaterial({ map: lbl, transparent: true })); tl.position.set(0, -H * 0.27, fz + 0.002); body.add(tl);
+  // under-frame with castors and a tow handle
+  const frame = mesh(new THREE.BoxGeometry(W + 0.04, 0.03, D + 0.04), M.tube); frame.position.y = Y - 0.01; root.add(frame);
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { const w = mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 20), M.rubber); w.rotation.z = Math.PI / 2; w.position.set(sx * (W / 2 - 0.02), 0.035, sz * (D / 2 - 0.03)); root.add(w); });
+  const tow = mesh(new THREE.TorusGeometry(0.06, 0.01, 8, 20, Math.PI), M.tube); tow.position.set(0, Y + H * 0.85, -D / 2 - 0.01); tow.rotation.x = Math.PI / 2; tow.rotation.z = Math.PI; root.add(tow);
+  // three-phase supply cable to a wall isolator
+  const box = mesh(new RoundedBoxGeometry(0.16, 0.22, 0.08, 2, 0.01), new THREE.MeshStandardMaterial({ color: 0x8a8f96, roughness: 0.5, metalness: 0.4 })); box.position.set(-0.05, 0.9, -1.55); root.add(box);
+  const lever = mesh(new THREE.BoxGeometry(0.02, 0.08, 0.03), M.redPlastic); lever.position.set(0.04, 0.92, -1.5); root.add(lever);
+  const cordC = new THREE.CatmullRomCurve3([V3(0, Y + 0.2, -D / 2), V3(0.02, 0.06, -D / 2 - 0.15), V3(0.0, 0.015, -0.8), V3(-0.05, 0.015, -1.4), V3(-0.05, 0.4, -1.57), V3(-0.05, 0.79, -1.56)]);
+  root.add(mesh(new THREE.TubeGeometry(cordC, 60, 0.011, 10), M.rubber));
+  const drawDisplay = (val, on) => { needle.rotation.z = on ? THREE.MathUtils.degToRad(63 - THREE.MathUtils.clamp(val / 250, 0, 1) * 126) : THREE.MathUtils.degToRad(63); };
+  return { root, body, knob, disp: face, drawDisplay, sw, sockets, ledG, socketWorld(k) { const v = new THREE.Vector3(); sockets[k].getWorldPosition(v); v.z += 0.025; return v; } };
+}
+
 S.build = ctx => {
   ctxRef = ctx;
   const M = ctx.M, R = S.root;
-  m = buildMachine(M); R.add(m.root);
+  m = buildRectifier(M); R.add(m.root);
   holder = buildHolder(M); R.add(holder);
   const shield = mesh(new THREE.CylinderGeometry(0.03, 0.022, 0.02, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0x3a3a3c, roughness: 0.5, metalness: 0.6, side: THREE.DoubleSide })); shield.rotation.z = Math.PI / 2; shield.position.x = 0.02; holder.add(shield);
   carbon = buildCarbon(M); carbon.position.x = 0.045; holder.add(carbon);
@@ -108,7 +180,7 @@ function updateCables(free) {
 }
 S.afterMove = () => updateCables();
 function setPower(on) { st.power = on; m.sw.userData.rocker.rotation.x = on ? -0.18 : 0.18; m.ledG.material = on ? ctxRef.M.ledGreenOn : ctxRef.M.ledGreenOff; m.drawDisplay(st.current, on); }
-function updateMachine() { m.knob.rotation.z = THREE.MathUtils.degToRad(135 - ((st.current - 40) / 160) * 270); m.drawDisplay(st.current, st.power); }
+function updateMachine() { m.knob.rotation.z = -((st.current - 40) / 160) * Math.PI * 4; m.drawDisplay(st.current, st.power); }
 S.setAssembled = all => {
   ['plugH', 'plugG', 'clamp', 'carbon'].forEach(k => asm[k] = all);
   if (all) { plugH.position.copy(sockW('minus')); plugH.rotation.set(0, 0, 0); plugG.position.copy(sockW('plus')); plugG.rotation.set(0, 0, 0); ap(clamp, POSE.clampOn); }
@@ -139,7 +211,7 @@ S.explodeItems = () => [{ o: holder, d: V3(0.04, 0.16, 0.06) }, { o: carbon, d: 
 S.cams = {
   explore: () => ({ pos: V3(0.62, 1.3, 1.42), target: V3(0.08, 0.55, 0.08) }),
   assemble: () => ({ pos: V3(0.3, 1.32, 1.72), target: V3(0.05, 0.42, 0.18) }),
-  operate: () => ({ pos: V3(-0.42, 0.56, 0.86), target: V3(-0.6, 0.37, 0.28) })
+  operate: () => ({ pos: V3(-0.25, 0.92, 1.3), target: V3(-0.62, 0.48, 0.22) })
 };
 
 S.asmSteps = [
@@ -164,7 +236,7 @@ S.asmPick = (id, ctx, r) => {
   const a = ctx.state.asm, s = S.asmSteps[a.step]; if (!s) return;
   if (st.power && s.id !== 'power' && id !== 'switch') return ctx.asmMsg('bad', 'اطفي الماكينة الأول.');
   switch (s.id) {
-    case 'power': if (id === 'switch') { setPower(false); ctx.audio.click(); ctx.next('الماكينة مطفية.'); } else ctx.asmMsg('bad', 'اطفي الماكينة الأول.'); break;
+    case 'power': if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة مطفية.'); } else ctx.asmMsg('bad', 'اطفي الماكينة الأول.'); break;
     case 'plugH': case 'plugG': {
       const isH = s.id === 'plugH', plug = isH ? plugH : plugG;
       if (!a.picked) { if (id === s.id) { a.picked = true; ctx.asmMsg('info', 'المس الطرف المناسب.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', 'المس الفيشة الصح الأول.'); return; }
@@ -173,7 +245,7 @@ S.asmPick = (id, ctx, r) => {
       if (isH && which === 'plus') return ctx.asmMsg('bad', 'لأ! في لحام الكربون الماسك على السالب (DCEN). على الموجب الكربون هيسخن ويستهلك بسرعة ويلوّث المعدن.');
       if (!isH && which === 'minus') return ctx.asmMsg('bad', 'السالب عليه الماسك. الأرضي على الموجب.');
       a.picked = null; ctx.E.setHighlight([]);
-      moveObj(ctx, plug, sockW(which), new THREE.Euler(0, 0, 0), 1, () => { asm[s.id] = true; ctx.audio.click(); ctx.next(isH ? 'الماسك على السالب (DCEN).' : 'الأرضي على الموجب.'); });
+      moveObj(ctx, plug, sockW(which), new THREE.Euler(0, 0, 0), 1, () => { asm[s.id] = true; ctx.audio.sfx('clunk'); ctx.next(isH ? 'الماسك على السالب (DCEN).' : 'الأرضي على الموجب.'); });
       break;
     }
     case 'clamp': if (id === 'clamp') { ctx.E.setHighlight([]); moveObj(ctx, clamp, POSE.clampOn.p, POSE.clampOn.r, 1, () => { asm.clamp = true; updateCables(); ctx.next('ماسك الأرضي متثبّت.'); }); } else ctx.asmMsg('bad', 'المس ماسك الأرضي.'); break;
