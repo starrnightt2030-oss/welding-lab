@@ -1,0 +1,27 @@
+name: voice
+# Records the Egyptian narration clips whenever the app's texts change.
+on:
+  push:
+    paths: ['voice/lines.json', 'source/tools/voice-gen.py', '.github/workflows/voice.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+concurrency: { group: voice, cancel-in-progress: false }
+jobs:
+  gen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install edge-tts==7.0.2
+      - run: python source/tools/voice-gen.py voice
+      - name: commit clips
+        run: |
+          git config user.name "voice-bot"; git config user.email "voice-bot@users.noreply.github.com"
+          git add -A voice
+          git diff --cached --quiet || (git commit -m "تسجيل الشرح الصوتي" && git push)
+      - name: rebuild pages
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: gh api -X POST repos/${{ github.repository }}/pages/builds || true
