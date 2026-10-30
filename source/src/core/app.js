@@ -724,7 +724,8 @@ export function startApp(STATIONS) {
       $('#loading').classList.add('done');
     } catch (e) {
       console.error(e);
-      $('#loading').innerHTML = `<p>حصلت مشكلة في تشغيل المجسمات ثلاثية الأبعاد على الجهاز ده.</p><small class="mono">${String(e && e.message || e)}</small>`;
+      $('#loading').innerHTML = `<p>حصلت مشكلة في تشغيل المعمل على الجهاز ده.</p><small class="mono">${String(e && e.message || e)}</small><button type="button" id="hard-reload" style="margin-top:1rem;padding:.8rem 1.2rem;border-radius:.8rem;border:none;background:#FF8A2B;color:#0E1014;font:700 1rem inherit">تنظيف وإعادة التحميل</button>`;
+      const hr = $('#hard-reload'); if (hr) hr.onclick = hardReload;
     }
   })();
 
@@ -745,6 +746,16 @@ export function startApp(STATIONS) {
     }
   };
 
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+  // in-app install button (Chrome / Edge / Android)
+  let deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; const b = $('#install-btn'); if (b) b.hidden = false; });
+  window.addEventListener('appinstalled', () => { const b = $('#install-btn'); if (b) b.hidden = true; showToast('good', 'اتثبّت المعمل كتطبيق على الجهاز.', true); });
+  document.addEventListener('click', e => { if (e.target.closest('#install-btn') && deferredInstall) { deferredInstall.prompt(); deferredInstall.userChoice.finally(() => { deferredInstall = null; $('#install-btn').hidden = true; }); } });
+  window.addEventListener('error', ev => { if (!booted) { const l = $('#loading'); if (l && !l.querySelector('#hard-reload')) { l.insertAdjacentHTML('beforeend', '<button type="button" id="hard-reload" style="margin-top:1rem;padding:.8rem 1.2rem;border-radius:.8rem;border:none;background:#FF8A2B;color:#0E1014;font-weight:700">تنظيف وإعادة التحميل</button>'); $('#hard-reload').onclick = hardReload; } } });
+  async function hardReload() {
+    try { const regs = await navigator.serviceWorker?.getRegistrations?.() || []; await Promise.all(regs.map(r => r.unregister())); const keys = await caches?.keys?.() || []; await Promise.all(keys.map(k => caches.delete(k))); } catch (e) { /* ignore */ }
+    location.replace(location.pathname + '?r=' + Date.now());
+  }
   return ctx;
 }

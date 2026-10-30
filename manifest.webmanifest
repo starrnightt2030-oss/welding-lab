@@ -4,15 +4,36 @@
   "description": "معمل لحام افتراضي ثلاثي الأبعاد لطلاب قسم اللحام بالمدارس الثانوية الصناعية — Designed & developed by Mohamed-Eldawly",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/welding-lab/index.html?source=pwa",
+  "scope": "/welding-lab/",
   "display": "fullscreen",
-  "orientation": "any",
+  "orientation": "landscape",
   "background_color": "#0E1014",
   "theme_color": "#0E1014",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "/welding-lab/?app=welding-lab-v2",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "categories": [
+    "education"
   ]
 }
