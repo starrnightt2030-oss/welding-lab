@@ -1,5 +1,5 @@
 // Spoken introductions for each station/stage (Egyptian Arabic, written for clear pronunciation).
-export const HUB = 'أهلاً بيك في معمل اللحام الافتراضي. اختار محطة من القايمة وابدأ. ونصيحة: ابدأ بمحطة السلامة الأول.';
+export const HUB = 'اختار محطة من القايمة وابدأ. ونصيحة: ابدأ بمحطة السلامة الأول.';
 export const INTRO = {
   safety: {
     explore: 'محطة السلامة والأدوات. المس أي حاجة على التربيزة عشان تمسكها وتقلّبها وتعرف بتستخدم في إيه. ولما تخلّص، دوس رجّعها للتربيزة.',

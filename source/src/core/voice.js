@@ -1,4 +1,6 @@
-// Arabic (Egyptian) narration via the device's speech engine, with text normalisation for correct pronunciation.
+// Egyptian-Arabic narration. Plays pre-recorded neural voice clips (voice/<id>.mp3, generated from the
+// app's own texts — see tools/voice-extract.mjs and .github/workflows/voice.yml). The device's speech engine
+// is only a last-resort fallback for a sentence that has no recorded clip.
 const DICT = [
   [/\s*\((DCEP|DCEN|DC\+|DC[−-]|AC|DC|HF|CV|MIG|MAG|TIG|FCAW|Cracking|Post-flow)\)/g, ''],
   [/E6013/g, 'إي ستة صفر واحد تلاتة'], [/E7018/g, 'إي سبعة صفر واحد تمانية'], [/ER70S-6/g, 'إي آر سبعين إس ستة'],
@@ -11,8 +13,7 @@ const DICT = [
   [/(\d)\s*°/g, '$1 درجة'], [/(\d)\s*[٪%]/g, '$1 في المية'], [/مم²/g, 'مللي مربع'],
   [/(\d+(?:[.,]\d+)?)\s*[–-]\s*(\d+(?:[.,]\d+)?)/g, 'من $1 لـ $2'],
   [/\(([^()]*[A-Za-z][^()]*)\)/g, ''], [/[«»"]/g, ''], [/[←→]/g, ' بعدين '], [/•/g, '، '], [/\s*\/\s*/g, ' أو '],
-  [/\bE\b/g, 'إي'], [/\s=\s/g, ' يعني '], [/[()]/g, '، '], [/مع من /g, 'مع '], [/بين من /g, 'بين '],
-  [/(^|[\s،.])الخبث(?=$|[\s،.؟!])/g, '$1الخَبَث'], [/(^|[\s،.])القطب(?=$|[\s،.؟!])/g, '$1القُطب'], [/(^|[\s،.])البركة(?=$|[\s،.؟!])/g, '$1البِركة'], [/(^|[\s،.])مبري(?=$|[\s،.؟!])/g, '$1مَبْري']
+  [/\bE\b/g, 'إي'], [/\s=\s/g, ' يعني '], [/[()]/g, '، '], [/مع من /g, 'مع '], [/بين من /g, 'بين ']
 ];
 const AR_DIGITS = { '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9', '٫': '.' };
 
@@ -22,33 +23,99 @@ export function speakable(t) {
   s = s.replace(/[A-Za-z][A-Za-z\s\-+/.&—]*[A-Za-z]/g, m => /^(E|ER|TIG|MIG|MAG)$/.test(m) ? m : '');   // drop leftover English
   return s.replace(/،\s*،/g, '،').replace(/،\s*([.:؛])/g, '$1').replace(/\s+([،.؟!:])/g, '$1').replace(/\s{2,}/g, ' ').replace(/(^[\s،.]+)|([\s،]+$)/g, '').trim();
 }
+// sentences: split after . ! ؟ ? : ؛ (not inside decimals like 0.8)
+export function sentences(s) {
+  return s.split(/(?<=[!؟?:؛\n])\s*|(?<=[^\d]\.)\s*|(?<=\d\.)(?=\s)\s*/).map(x => x.trim()).filter(x => /[؀-ۿ\d]/.test(x));
+}
+// lookup key: no diacritics/punctuation, unified letter forms
+export function keyWords(s) {
+  return s.replace(/[ً-ٰٟـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+    .replace(/(\d)\.(\d)/g, '$1d$2').replace(/[^ء-ي\d\sd]/g, ' ').split(/\s+/).filter(Boolean);
+}
+export function clipId(words) {   // FNV-1a 32 → base36
+  let h = 0x811c9dc5; const s = words.join(' ');
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
 
 export class Voice {
-  constructor() {
-    this.enabled = true; this.voice = null; this.ok = 'speechSynthesis' in window; this.last = ''; this.lastT = 0; this.warned = false;
-    if (!this.ok) return;
-    const pick = () => {
-      const vs = speechSynthesis.getVoices().filter(v => /^ar/i.test(v.lang));
-      const score = v => (/ar[-_]EG/i.test(v.lang) ? 100 : /ar[-_](SA|AE|JO|LB)/i.test(v.lang) ? 40 : 20) + (/natural|online|neural|wavenet|salma|shakir|hamed|zariyah/i.test(v.name) ? 50 : 0) + (v.localService ? 0 : 5);
-      this.voice = vs.sort((a, b) => score(b) - score(a))[0] || null;
-    };
-    pick(); speechSynthesis.onvoiceschanged = pick;
+  constructor({ getCtx, base = 'voice/' } = {}) {
+    this.enabled = true; this.getCtx = getCtx; this.base = base;
+    this.ids = null; this.buf = new Map(); this.queue = []; this.src = null; this.token = 0;
+    this.last = ''; this.lastT = 0; this.busy = false; this.missing = new Set();
+    this.ready = fetch(base + 'index.json').then(r => r.ok ? r.json() : null).then(j => { this.ids = new Set(j && j.ids || []); }).catch(() => { this.ids = new Set(); });
+    this.tts = 'speechSynthesis' in window; this.ttsVoice = null;
+    if (this.tts) { const pick = () => { const vs = speechSynthesis.getVoices().filter(v => /^ar/i.test(v.lang)); this.ttsVoice = vs.find(v => /EG/i.test(v.lang)) || vs[0] || null; }; pick(); speechSynthesis.onvoiceschanged = pick; }
   }
-  get available() { return this.ok && !!this.voice; }
-  // priority: 'high' interrupts anything; 'normal' interrupts lower; 'low' (coach tips) only if idle
-  say(text, prio = 'normal') {
-    if (!this.ok || !this.enabled) return;
+  get speaking() { return this.busy; }
+  // split a sentence into the fewest recorded clips (dynamic programming over words)
+  plan(sent) {
+    const w = keyWords(sent); if (!w.length) return [];
+    const whole = clipId(w); if (this.ids.has(whole)) return [{ id: whole }];
+    const n = w.length, best = new Array(n + 1).fill(null); best[0] = [];
+    for (let i = 0; i < n; i++) {
+      if (!best[i]) continue;
+      for (let j = Math.min(n, i + 40); j > i; j--) {
+        const id = clipId(w.slice(i, j));
+        if (this.ids.has(id) && (!best[j] || best[j].length > best[i].length + 1)) best[j] = best[i].concat([{ id }]);
+      }
+      if (!best[i + 1]) best[i + 1] = best[i].concat([{ text: w[i] }]);   // unknown word → fallback
+    }
+    // merge consecutive fallback words into one TTS chunk
+    const out = [];
+    for (const p of best[n]) { const l = out[out.length - 1]; if (p.text && l && l.text) l.text += ' ' + p.text; else out.push({ ...p }); }
+    return out;
+  }
+  async load(id) {
+    if (this.buf.has(id)) return this.buf.get(id);
+    const ctx = this.getCtx && this.getCtx(); if (!ctx) return null;
+    const pr = fetch(this.base + id + '.mp3').then(r => { if (!r.ok) throw 0; return r.arrayBuffer(); }).then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej))).catch(() => null);
+    this.buf.set(id, pr); if (this.buf.size > 80) this.buf.delete(this.buf.keys().next().value);
+    return pr;
+  }
+  // priority: 'high'/'normal' interrupt; 'low' (coach tips) only when idle
+  async say(text, prio = 'normal') {
+    if (!this.enabled) return;
     const s = speakable(text); if (!s) return;
     const now = performance.now();
     if (s === this.last && now - this.lastT < 5000) return;
-    if (prio === 'low' && speechSynthesis.speaking) return;
-    if (!this.voice) { this.voice = speechSynthesis.getVoices().find(v => /^ar/i.test(v.lang)) || null; }
-    if (!this.voice) { if (!this.warned && this.onMissing) { this.warned = true; this.onMissing(); } return; }
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(s);
-    u.voice = this.voice; u.lang = this.voice.lang; u.rate = 0.96; u.pitch = 1; u.volume = 1;
+    if (prio === 'low' && this.busy) return;
     this.last = s; this.lastT = now;
-    speechSynthesis.speak(u);
+    this.stop(); const tok = ++this.token;
+    if (!this.ids) await this.ready;
+    if (tok !== this.token) return;
+    const parts = []; for (const st of sentences(s)) { parts.push(...this.plan(st)); parts.push({ gap: 0.18 }); }
+    parts.forEach(p => p.id && this.load(p.id));   // prefetch all
+    this.busy = true;
+    for (const p of parts) {
+      if (tok !== this.token) return;
+      if (p.gap) { await new Promise(r => setTimeout(r, p.gap * 1000)); continue; }
+      if (p.id) { const b = await this.load(p.id); if (tok !== this.token) return; if (b) await this.play(b, tok); }
+      else if (p.text) { this.missing.add(p.text); await this.speakTTS(p.text, tok); }
+    }
+    if (tok === this.token) this.busy = false;
   }
-  stop() { if (this.ok) speechSynthesis.cancel(); }
+  play(b, tok) {
+    const ctx = this.getCtx(); if (!ctx) return Promise.resolve();
+    if (ctx.state === 'suspended') ctx.resume();
+    return new Promise(res => {
+      const src = ctx.createBufferSource(); src.buffer = b;
+      if (!this.out) { this.out = ctx.createGain(); this.out.gain.value = 1.15; this.out.connect(ctx.destination); }
+      src.connect(this.out); src.onended = () => { if (this.src === src) this.src = null; res(); };
+      this.src = src; src.start();
+      setTimeout(res, b.duration * 1000 + 400);   // safety if onended never fires
+    });
+  }
+  speakTTS(t, tok) {
+    if (!this.tts || !this.ttsVoice) return Promise.resolve();
+    return new Promise(res => {
+      const u = new SpeechSynthesisUtterance(t); u.voice = this.ttsVoice; u.lang = this.ttsVoice.lang; u.rate = 0.95;
+      u.onend = u.onerror = () => res(); speechSynthesis.speak(u); setTimeout(res, 400 + t.length * 120);
+    });
+  }
+  stop() {
+    this.token++; this.busy = false;
+    if (this.src) { try { this.src.stop(); } catch (e) {} this.src = null; }
+    if (this.tts) speechSynthesis.cancel();
+  }
 }

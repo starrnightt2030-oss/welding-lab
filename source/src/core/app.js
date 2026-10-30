@@ -7,6 +7,7 @@ import { ArcAudio } from '../audio.js';
 import { AR } from '../data.js';
 import { ICON } from './icons.js';
 import { Voice } from './voice.js';
+import { runIntro, WELCOME } from '../intro.js';
 import { HUB, INTRO } from '../voicescript.js';
 import { buildChippingHammer, buildWireBrush } from '../ppe.js';
 
@@ -20,9 +21,9 @@ export function startApp(STATIONS) {
   const viewport = $('#viewport');
   const E = createEngine(viewport);
   const audio = new ArcAudio();
-  const voice = new Voice();
+  const intro = runIntro();
+  const voice = new Voice({ getCtx: () => { audio.ensure(); return audio.ctx; } });
   voice.enabled = store.get('voice', true);
-  voice.onMissing = () => showToast('info', 'الجهاز ده مافيهوش صوت عربي للشرح. على ويندوز افتح المعمل من متصفح Edge، وعلى الموبايل نزّل الصوت العربي من إعدادات تحويل النص إلى كلام.', true);
   const state = {
     station: null, stage: 'hub', done: store.get('done2', {}),
     explore: { sel: 0, labels: false, exploded: false },
@@ -217,17 +218,17 @@ export function startApp(STATIONS) {
 
 
   // ---------------------------------------------------------------- hold & inspect (pick up a tool, turn it, put it back)
-  const DEFAULT_HOLD = ['hammer', 'brush', 'holder', 'electrode', 'clamp', 'torch', 'lighter', 'goggles', 'rods', 'regO', 'regA', 'flow', 'spool', 'twin', 'gouge', 'carbon', 'tungsten', 'pedal', 'cutter'];
+  const DEFAULT_HOLD = ['machine', 'cylinder', 'cylO', 'cylA', 'plates', 'drive', 'hammer', 'brush', 'holder', 'electrode', 'clamp', 'torch', 'lighter', 'goggles', 'rods', 'regO', 'regA', 'flow', 'spool', 'twin', 'gouge', 'carbon', 'tungsten', 'pedal', 'cutter'];
   function canHold(id) { const s = S(); return s && state.stage === 'explore' && (s.holdable ? s.holdable(id) : DEFAULT_HOLD.includes(id)) && !!(s.partObject && s.partObject(id) || id === 'hammer' || id === 'brush'); }
   let hold = null;
   const holdScene = new THREE.Scene();
   holdScene.environment = E.scene.environment;
-  holdScene.add(new THREE.HemisphereLight(0xdfe8f5, 0x3a3028, 1.1));
-  const hKey = new THREE.DirectionalLight(0xfff2e0, 2.4); hKey.position.set(1, 2, 2); holdScene.add(hKey);
+  holdScene.add(new THREE.HemisphereLight(0xdfe8f5, 0x3a3028, 0.75));
+  const hKey = new THREE.DirectionalLight(0xfff2e0, 1.7); hKey.position.set(1, 2, 2); holdScene.add(hKey);
   const hRim = new THREE.DirectionalLight(0x9cc4ff, 1.4); hRim.position.set(-2, 1, -2); holdScene.add(hRim);
   const dim = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x07090c, transparent: true, opacity: 0, depthTest: false, depthWrite: false }));
-  dim.renderOrder = -10; holdScene.add(dim);
-  E.overlay = holdScene;
+  const dimScene = new THREE.Scene(); dimScene.add(dim);
+  E.overlay = holdScene; E.overlayBg = dimScene;
   function holdPart(obj) {
     if (!obj || !obj.isObject3D) return;
     if (hold) { if (hold.obj === obj) return; releaseHold(true); }
@@ -252,7 +253,7 @@ export function startApp(STATIONS) {
       const e = ease(k);
       pivot.position.lerpVectors(p0, target(), e); pivot.position.y += Math.sin(Math.PI * e) * 0.06;
       pivot.scale.setScalar(1 + (sc - 1) * e); pivot.quaternion.slerpQuaternions(q0, qT, e);
-      dim.material.opacity = 0.62 * e;
+      dim.material.opacity = 0.86 * e;
     }, () => { hold && (hold.ready = true); });
     renderHoldUI();
   }
@@ -268,7 +269,7 @@ export function startApp(STATIONS) {
       const e = ease(k);
       h.pivot.position.lerpVectors(p0, h.center, e); h.pivot.position.y += Math.sin(Math.PI * e) * 0.05;
       h.pivot.quaternion.slerpQuaternions(q0, qI, e); h.pivot.scale.setScalar(s0 + (1 - s0) * e);
-      dim.material.opacity = 0.62 * (1 - e);
+      dim.material.opacity = 0.86 * (1 - e);
     }, finish);
   }
   function holdPointer(ev, phase) {
@@ -304,12 +305,12 @@ export function startApp(STATIONS) {
   }
   function renderHoldUI() {
     const el = $('#hold-ui'); if (!el) return;
-    el.hidden = !hold;
+    el.hidden = !hold; hotLayer.style.visibility = hold ? 'hidden' : '';
     if (hold) { const s = S(), p = s && s.parts && s.parts[state.explore.sel]; $('#hold-name').textContent = p ? p.name : ''; }
   }
 
   // ---------------------------------------------------------------- assemble
-  function highlightAsm() { const s = S(); E.setHighlight(s.asmTargets(state.asm.step, ctx)); renderPanel(); }
+  function highlightAsm() { const s = S(); E.setHighlight(s.asmTargets(state.asm.step, ctx)); const c = s.asmCam && s.asmCam(state.asm.step, ctx); if (c) E.flyTo(c.pos, c.target, 0.9); renderPanel(); }
   function asmNext(msg) {
     const s = S();
     state.asm.step++; state.asm.picked = null; state.asm.msg = { t: 'good', s: msg };
@@ -719,9 +720,15 @@ export function startApp(STATIONS) {
       await build();
       state.station = 'smaw';
       goHub();
-      booted = true;
       E.start();
-      $('#loading').classList.add('done');
+      await intro.ready();
+      audio.ensure(); tryLandscape();
+      audio.sfx('intro');
+      const said = voice.say(WELCOME, 'high');
+      await Promise.race([Promise.all([said, new Promise(r => setTimeout(r, 3600))]), new Promise(r => setTimeout(r, 9000))]);
+      intro.finish();
+      booted = true;
+      setTimeout(() => voice.say(HUB), 700);
     } catch (e) {
       console.error(e);
       $('#loading').innerHTML = `<p>حصلت مشكلة في تشغيل المعمل على الجهاز ده.</p><small class="mono">${String(e && e.message || e)}</small><button type="button" id="hard-reload" style="margin-top:1rem;padding:.8rem 1.2rem;border-radius:.8rem;border:none;background:#FF8A2B;color:#0E1014;font:700 1rem inherit">تنظيف وإعادة التحميل</button>`;
@@ -730,7 +737,7 @@ export function startApp(STATIONS) {
   })();
 
   if (/[?&]debug/.test(location.search)) window.__wl = {
-    state, ctx, goStage, enterStation, goHub, finishWeld, E, sim: () => sim, S,
+    state, ctx, goStage, enterStation, goHub, finishWeld, E, sim: () => sim, S, voice, spoken: (() => { const a = []; const o = voice.say.bind(voice); voice.say = (t, p) => { a.push(t); return o(t, p); }; return a; })(),
     simulate(secs = 50, opts = {}) {
       const dt = 1 / 60, proc = sim.proc; let x = JOINT.x0;
       const sp = opts.speed ?? (proc.ideal.speed[0] + proc.ideal.speed[1]) / 2, dd = opts.dist ?? (proc.ideal.dist[0] + proc.ideal.dist[1]) / 2;

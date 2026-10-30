@@ -9,21 +9,27 @@ old = json.load(open(idx_path)) if os.path.exists(idx_path) else {}
 if old.get('voice') != VOICE + RATE + PITCH:   # voice changed → regenerate everything
     for f in os.listdir(D):
         if f.endswith('.mp3'): os.remove(os.path.join(D, f))
-sem = asyncio.Semaphore(6); done = []; fail = []
+sem = asyncio.Semaphore(5); done = []; fail = []
+def save_index():
+    json.dump({'voice': VOICE + RATE + PITCH, 'ids': sorted(done)}, open(idx_path, 'w'))
 async def one(i, t):
     p = os.path.join(D, i + '.mp3')
     if os.path.exists(p) and os.path.getsize(p) > 500: done.append(i); return
     async with sem:
         for k in range(4):
             try:
-                await edge_tts.Communicate(t, VOICE, rate=RATE, pitch=PITCH).save(p)
-                if os.path.getsize(p) > 500: done.append(i); return
-            except Exception as e: err = e
+                await asyncio.wait_for(edge_tts.Communicate(t, VOICE, rate=RATE, pitch=PITCH).save(p + '.part'), 45)
+                if os.path.getsize(p + '.part') > 500:
+                    os.replace(p + '.part', p)
+                    done.append(i)
+                    if len(done) % 50 == 0: save_index(); print('progress', len(done), '/', len(lines), flush=True)
+                    return
+            except Exception as e: print('retry', i, type(e).__name__, flush=True)
             await asyncio.sleep(1 + k * 2)
         fail.append((i, t))
 async def main(): await asyncio.gather(*[one(i, t) for i, t in lines.items()])
 asyncio.run(main())
 for f in os.listdir(D):   # drop clips no longer used
-    if f.endswith('.mp3') and f[:-4] not in lines: os.remove(os.path.join(D, f))
-json.dump({'voice': VOICE + RATE + PITCH, 'ids': sorted(done)}, open(idx_path, 'w'))
+    if (f.endswith('.mp3') and f[:-4] not in lines) or f.endswith('.part'): os.remove(os.path.join(D, f))
+save_index()
 print('ok', len(done), 'failed', len(fail)); [print(' ', x) for x in fail[:20]]

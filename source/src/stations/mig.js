@@ -94,17 +94,40 @@ S.build = ctx => {
   // side door open on +X with spool inside
   door = mesh(new THREE.BoxGeometry(0.004, H - 0.06, D - 0.16), new THREE.MeshPhysicalMaterial({ color: CO2 ? 0x1f5fa8 : 0x3a4250, roughness: 0.45, clearcoat: 0.3 }));
   const hinge = new THREE.Group(); hinge.position.set(W / 2 + 0.003, 0, D / 2 - 0.08); m.body.add(hinge);
-  door.position.set(0, 0, -(D - 0.16) / 2); hinge.add(door); hinge.rotation.y = -1.25;
+  door.position.set(0, 0, -(D - 0.16) / 2); hinge.add(door); hinge.rotation.y = -1.95;
   const cavity = mesh(new THREE.BoxGeometry(0.002, H - 0.07, D - 0.17), new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.9 })); cavity.position.set(W / 2 + 0.0015, 0, 0); m.body.add(cavity);
   spool = new THREE.Group();
   const flange = new THREE.CylinderGeometry(0.1, 0.1, 0.006, 40);
   [-0.026, 0.026].forEach(z => { const f = mesh(flange, M.blackPlastic); f.position.y = z; spool.add(f); });
   const wound = mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.05, 40), new THREE.MeshStandardMaterial({ color: 0xb8743f, roughness: 0.35, metalness: 1, bumpMap: Textures.knurl().bumpMap, bumpScale: 0.5 })); spool.add(wound);
   spool.rotation.z = Math.PI / 2;
+  // wire-drive unit mounted on the compartment wall (in front of / below the spool), clearly visible when the door is open
   rolls = new THREE.Group();
-  [0.012, -0.012].forEach(y => { const r = mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.012, 24), new THREE.MeshStandardMaterial({ color: 0xc2c8ce, roughness: 0.3, metalness: 1 })); r.rotation.z = Math.PI / 2; r.position.y = y; rolls.add(r); });
-  const arm = mesh(new THREE.BoxGeometry(0.012, 0.05, 0.02), M.blackPlastic); arm.position.set(0, 0.03, 0.02); rolls.add(arm);
-  rolls.position.set(W / 2 - 0.02, -0.05, D / 2 - 0.08); m.body.add(rolls);
+  const steelR = new THREE.MeshStandardMaterial({ color: 0xd2d7dc, roughness: 0.22, metalness: 1 });
+  const plate = mesh(new RoundedBoxGeometry(0.012, 0.1, 0.13, 2, 0.004), new THREE.MeshStandardMaterial({ color: 0x2b2f35, roughness: 0.55, metalness: 0.6 })); rolls.add(plate);
+  const motor = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 28), new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.5, metalness: 0.5 })); motor.rotation.z = Math.PI / 2; motor.position.set(-0.012, -0.02, 0.02); rolls.add(motor);
+  const rollG = new THREE.CylinderGeometry(0.022, 0.022, 0.014, 32), grooveG = new THREE.TorusGeometry(0.0205, 0.0022, 8, 32);
+  const mkRoll = (y, z) => { const g = new THREE.Group(); const r = mesh(rollG, steelR); r.rotation.z = Math.PI / 2; g.add(r); const gr = mesh(grooveG, new THREE.MeshStandardMaterial({ color: 0x5a6068, roughness: 0.4, metalness: 1 })); gr.rotation.y = Math.PI / 2; g.add(gr); const hub = mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.018, 16), M.brass); hub.rotation.z = Math.PI / 2; g.add(hub); g.position.set(0.014, y, z); rolls.add(g); return g; };
+  const rDown = mkRoll(-0.02, 0.02), rUp = mkRoll(0.025, 0.02);
+  // orange pressure arm that swings down onto the upper roll + tension knob
+  const armPivot = new THREE.Group(); armPivot.position.set(0.022, 0.03, -0.035); rolls.add(armPivot);
+  const armMat = new THREE.MeshPhysicalMaterial({ color: 0xff7a1a, roughness: 0.35, clearcoat: 0.6 });
+  const armB = mesh(new RoundedBoxGeometry(0.012, 0.016, 0.1, 2, 0.004), armMat); armB.position.set(0, 0.006, 0.05); armPivot.add(armB);
+  const knob = new THREE.Group(); const kc = mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.03, 18), M.blackPlastic); knob.add(kc); const ks = mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.03, 8), steelR); ks.position.y = -0.02; knob.add(ks);
+  knob.position.set(0, 0.02, 0.092); armPivot.add(knob);
+  // wire guides in/out
+  const guide = new THREE.CylinderGeometry(0.004, 0.004, 0.04, 10);
+  const gIn = mesh(guide, M.brass); gIn.rotation.x = Math.PI / 2; gIn.position.set(0.014, 0.0025, -0.035); rolls.add(gIn);
+  const gOut = mesh(guide, M.brass); gOut.rotation.x = Math.PI / 2; gOut.position.set(0.014, 0.0025, 0.075); rolls.add(gOut);
+  // invisible, generous touch target
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, 0.17), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(0.02, 0, 0.015); hit.userData.noHi = true; rolls.add(hit);
+  rolls.userData.setArm = (closed, ctx) => {
+    const to = closed ? 0 : -0.75;
+    if (!ctx) { armPivot.rotation.x = to; return; }
+    const from = armPivot.rotation.x; ctx.E.tween(0.5, k => { armPivot.rotation.x = from + (to - from) * ctx.ease(k); rUp.rotation.x = rDown.rotation.x = -k * 3; });
+  };
+  rolls.userData.setArm(false);
+  rolls.position.set(W / 2 + 0.003, -0.13, 0.1); m.body.add(rolls);
   spoolBox = new THREE.Group();
   const bx = mesh(new THREE.BoxGeometry(0.22, 0.07, 0.22), M.cardboard); bx.position.y = 0.035; spoolBox.add(bx);
   spoolBox.position.set(-0.2, 0, 0.45); R.add(spoolBox);
@@ -155,7 +178,7 @@ const outletW = o => { o.updateMatrixWorld(true); return o.userData.outletLocal.
 const anc = (o, l) => { o.updateMatrixWorld(true); return l.clone().applyMatrix4(o.matrixWorld); };
 const dirW = (o, l) => { o.updateMatrixWorld(true); return l.clone().transformDirection(o.matrixWorld); };
 function spoolPose(inside) {
-  if (inside) { m.root.updateMatrixWorld(true); spool.position.copy(anc(m.body, V3(W / 2 - 0.07, 0.06, -0.05))); spool.rotation.set(0, 0, Math.PI / 2); }
+  if (inside) { m.root.updateMatrixWorld(true); spool.position.copy(anc(m.body, V3(W / 2 + 0.04, 0.07, -0.06))); spool.rotation.set(0, 0, Math.PI / 2); }
   else { spool.position.set(-0.2, 0.08, 0.45); spool.rotation.set(0, 0, 0); }
 }
 function updateCables(free) {
@@ -176,7 +199,7 @@ function updateMachine() {
 }
 S.setAssembled = all => {
   ['spool', 'drive', 'torch', 'tip', 'ground', 'clamp', 'gas', 'feed'].forEach(k => asm[k] = all);
-  spoolPose(all);
+  spoolPose(all); rolls.userData.setArm(all);
   if (all) { plugT.position.copy(sockW('euro')); plugT.rotation.set(0, 0, 0); plugG.position.copy(sockW('minus')); plugG.rotation.set(0, 0, 0); ap(clamp, POSE.clampOn); flow.position.copy(outletW(cyl)); flow.rotation.set(0, 0, 0); }
   else { ap(plugT, POSE.plugTFloor); ap(plugG, POSE.plugGFloor); ap(clamp, POSE.clampFloor); ap(flow, POSE.flowShelf); }
   ap(torch, POSE.torchRest);
@@ -213,9 +236,9 @@ S.cams = {
 };
 
 S.asmSteps = [
-  { id: 'power', title: 'اطفي الماكينة وافتح باب البكرة', hint: 'المس مفتاح التشغيل.' },
+  { id: 'power', title: 'اطفي الماكينة وافتح باب البكرة', hint: 'المس مفتاح التشغيل اللي ورا الماكينة.' },
   { id: 'spool', title: 'ركّب بكرة السلك ٠٫٨ مم', hint: 'المس كرتونة البكرة اللي على الأرض.' },
-  { id: 'drive', title: 'اختار بكر التغذية بمجرى ٠٫٨ واضبط الضغط', hint: 'المس وحدة التغذية جوه الماكينة.' },
+  { id: 'drive', title: 'ركّب بكر التغذية المناسب للسلك واقفل ذراع الضغط', hint: 'المس وحدة التغذية: البكرتين الفضة والذراع البرتقاني تحت بكرة السلك جوه الباب المفتوح.' },
   { id: 'torch', title: 'وصّل التورش في وصلة اليورو', hint: 'المس فيشة التورش، وبعدين وصلة اليورو في نص الماكينة.' },
   { id: 'ground', title: 'وصّل كابل الأرضي بالسالب (−)', hint: 'المس فيشة الأرضي، وبعدين الطرف المناسب.' },
   { id: 'clamp', title: 'ثبّت ماسك الأرضي على الطاولة', hint: 'المس ماسك الأرضي.' },
@@ -223,6 +246,13 @@ S.asmSteps = [
   { id: 'feed', title: 'سحّب السلك لحد ما يطلع من التورش، وركّب الفونية ٠٫٨ والفوهة', hint: 'المس التورش.' }
 ];
 S.asmStart = () => { setPower(true); };
+S.asmCam = step => {
+  const id = S.asmSteps[step] && S.asmSteps[step].id;
+  if (id === 'torch') return S.cams.assemble();
+  if (id !== 'drive') return null;
+  m.root.updateMatrixWorld(true);   // look into the open side compartment from behind the swung-open door
+  return { pos: anc(m.body, V3(W / 2 + 0.52, 0.16, -0.12)), target: anc(m.body, V3(W / 2, -0.07, 0.04)) };
+};
 S.asmTargets = (step, ctx) => {
   const s = S.asmSteps[step]; if (!s) return [];
   const p = ctx.state.asm.picked;
@@ -238,8 +268,8 @@ S.asmPick = (id, ctx, r) => {
   if (st.power && s.id !== 'power' && id !== 'switch') return ctx.asmMsg('bad', 'اطفي الماكينة الأول.');
   switch (s.id) {
     case 'power': if (id === 'switch') { setPower(false); ctx.audio.sfx('clunk'); ctx.next('الماكينة مطفية، وباب البكرة مفتوح.'); } else ctx.asmMsg('bad', 'اطفي الماكينة الأول.'); break;
-    case 'spool': if (id === 'spoolBox' || id === 'spool') { m.root.updateMatrixWorld(true); const to = anc(m.body, V3(W / 2 - 0.07, 0.06, -0.05)); moveObj(ctx, spool, to, new THREE.Euler(0, 0, Math.PI / 2), 1.1, () => { asm.spool = true; ctx.next('البكرة اتركبت، وطرف السلك ماسكه عشان مايفكّش.'); }); } else ctx.asmMsg('bad', 'المس كرتونة البكرة.'); break;
-    case 'drive': if (id === 'drive') { asm.drive = true; ctx.audio.sfx('clunk'); ctx.next('بكر التغذية بمجرى ٠٫٨ (حرف V للسلك الصلب)، والضغط متوسط.'); } else ctx.asmMsg('bad', 'المس بكر التغذية جوه الماكينة (جنب البكرة).'); break;
+    case 'spool': if (id === 'spoolBox' || id === 'spool') { m.root.updateMatrixWorld(true); const to = anc(m.body, V3(W / 2 + 0.04, 0.07, -0.06)); moveObj(ctx, spool, to, new THREE.Euler(0, 0, Math.PI / 2), 1.1, () => { asm.spool = true; ctx.next('البكرة اتركبت، وطرف السلك ماسكه عشان مايفكّش.'); }); } else ctx.asmMsg('bad', 'المس كرتونة البكرة.'); break;
+    case 'drive': if (id === 'drive') { asm.drive = true; rolls.userData.setArm(true, ctx); ctx.audio.sfx('clunk'); ctx.next('تمام. ركّبنا بكر بمجرى ٠٫٨ على شكل حرف V عشان السلك الصلب، وقفلنا الذراع البرتقاني بضغط متوسط: لو الضغط زيادة السلك يتفرطح، ولو قليل يزحلق.'); } else ctx.asmMsg('bad', 'المس وحدة التغذية: البكرتين الفضة والذراع البرتقاني تحت بكرة السلك.'); break;
     case 'torch':
       if (!a.picked) { if (id === 'plugT') { a.picked = true; ctx.asmMsg('info', 'المس وصلة اليورو.'); ctx.E.setHighlight(S.asmTargets(a.step, ctx)); } else ctx.asmMsg('bad', 'المس فيشة التورش (الكبيرة السودا).'); return; }
       if (id !== 'euro') return ctx.asmMsg('bad', 'التورش بيتوصل في وصلة اليورو (الوسط)، مش في أطراف الأرضي.');

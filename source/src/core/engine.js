@@ -6,6 +6,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { TABLE_Y } from '../models.js';
 
 export const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -44,6 +45,11 @@ export function createEngine(viewport) {
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.5, 2.2);
   composer.addPass(bloom);
+  // selection = clean glowing outline around the part's silhouette (no tint over the part itself)
+  const outline = new OutlinePass(new THREE.Vector2(256, 256), scene, camera);
+  outline.visibleEdgeColor.set(0xff7a00); outline.hiddenEdgeColor.set(0x7a3a00);
+  outline.edgeStrength = 9; outline.edgeGlow = 0.35; outline.edgeThickness = 2.2; outline.pulsePeriod = 2.4; outline.enabled = false;
+  composer.addPass(outline);
   composer.addPass(new OutputPass());
 
   scene.add(new THREE.HemisphereLight(0xc4d2e4, 0x2e2620, 0.7));
@@ -69,19 +75,11 @@ export function createEngine(viewport) {
     tw.cam = true;
   };
 
-  // ---- highlight (pulsing emissive copy of the material)
-  const hiCache = new Map(), hiMats = new Set();
-  const hiMat = mat => {
-    if (Array.isArray(mat)) return mat.map(hiMat);
-    if (!mat.emissive) return mat;
-    if (!hiCache.has(mat)) { const c = mat.clone(); c.emissive = new THREE.Color(0xff8a2b); c.emissiveIntensity = 0.3; if ('emissiveMap' in c) c.emissiveMap = null; hiCache.set(mat, c); hiMats.add(c); }
-    return hiCache.get(mat);
-  };
+  // ---- highlight (outline only)
   let highlighted = [];
   const setHighlight = objs => {
-    highlighted.forEach(o => o.traverse(m => { if (m.isMesh && m.userData.origMat) { m.material = m.userData.origMat; delete m.userData.origMat; } }));
     highlighted = (objs || []).filter(Boolean);
-    highlighted.forEach(o => o.traverse(m => { if (m.isMesh && !m.userData.origMat && !m.userData.noHi) { m.userData.origMat = m.material; m.material = hiMat(m.material); } }));
+    outline.selectedObjects = highlighted; outline.enabled = highlighted.length > 0;
   };
 
   // ---- picking
@@ -128,12 +126,10 @@ export function createEngine(viewport) {
       const t = tweens[i]; t.t += Math.min(raw, 0.1); const k = Math.min(1, t.t / t.dur); t.fn(k);
       if (k >= 1) { tweens.splice(i, 1); t.done && t.done(); }
     }
-    const pulse = 0.18 + (Math.sin(performance.now() / 260) * 0.5 + 0.5) * 0.35;
-    hiMats.forEach(m => m.emissiveIntensity = pulse);
     hooks.forEach(f => f(dt, raw));
     controls.update();
     composer.render();
-    if (E.overlay && E.overlay.children.length > 4) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(E.overlay, camera); renderer.autoClear = true; }
+    if (E.overlay && E.overlay.children.length > 3) { renderer.autoClear = false; if (E.overlayBg) renderer.render(E.overlayBg, camera); renderer.clearDepth(); renderer.render(E.overlay, camera); renderer.autoClear = true; }
     requestAnimationFrame(loop);
   };
 

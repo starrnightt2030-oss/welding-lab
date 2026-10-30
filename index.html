@@ -55,7 +55,112 @@
 <button type="button" id="drawer-toggle" class="glass" data-act="drawer" aria-label="افتح اللوحة"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>اللوحة</span></button>
 
 <div id="rotate" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M3 12a9 9 0 0 0 4 7M21 12a9 9 0 0 0-4-7"/></svg><b>لف الموبايل بالعرض</b><span>المعمل مصمم يشتغل بعرض الشاشة زي الألعاب</span><button type="button" data-act="rotate-skip">كمّل بالطول</button></div>
-<div id="loading"><div class="spin"></div><b>بنجهّز المعمل…</b><small>تحميل المجسمات والخامات</small><small class="credit-l" dir="ltr">Designed &amp; developed by Mohamed-Eldawly</small></div>
+<div id="loading">
+  <div class="intro-bg" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="intro">
+    <div class="intro-art" aria-hidden="true">
+      <svg viewBox="0 0 420 470" class="welder">
+        <defs>
+          <linearGradient id="gLeather" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b8743a"/><stop offset="1" stop-color="#7a4520"/></linearGradient>
+          <linearGradient id="gApron" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c5c2a"/><stop offset="1" stop-color="#6b3b18"/></linearGradient>
+          <linearGradient id="gHelm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a4049"/><stop offset=".6" stop-color="#1d2128"/><stop offset="1" stop-color="#121418"/></linearGradient>
+          <linearGradient id="gLens" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fbf7a"/><stop offset="1" stop-color="#0b3a22"/></linearGradient>
+          <linearGradient id="gPants" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#34497a"/><stop offset="1" stop-color="#1c2a4c"/></linearGradient>
+          <linearGradient id="gGlove" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0bd72"/><stop offset="1" stop-color="#b57b35"/></linearGradient>
+          <linearGradient id="gMach" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffa04a"/><stop offset="1" stop-color="#d4601a"/></linearGradient>
+          <linearGradient id="gCylO" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2f5fa8"/><stop offset=".45" stop-color="#5b8ad6"/><stop offset="1" stop-color="#1d3d72"/></linearGradient>
+          <linearGradient id="gCylA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a3262a"/><stop offset=".45" stop-color="#e2524f"/><stop offset="1" stop-color="#6e1518"/></linearGradient>
+          <linearGradient id="gSteel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d0d8"/><stop offset="1" stop-color="#6d7681"/></linearGradient>
+          <radialGradient id="gArc"><stop offset="0" stop-color="#fff"/><stop offset=".25" stop-color="#d8f0ff"/><stop offset=".55" stop-color="#7cc8ff" stop-opacity=".55"/><stop offset="1" stop-color="#7cc8ff" stop-opacity="0"/></radialGradient>
+          <radialGradient id="gWarm"><stop offset="0" stop-color="#ffb070" stop-opacity=".55"/><stop offset="1" stop-color="#ff8a2b" stop-opacity="0"/></radialGradient>
+        </defs>
+        <ellipse cx="215" cy="448" rx="190" ry="16" fill="#000" opacity=".45"/>
+        <ellipse class="arc-floor" cx="78" cy="440" rx="120" ry="22" fill="url(#gWarm)"/>
+        <!-- gas cylinders -->
+        <g class="cyl" stroke="#0b0d10" stroke-width="3" stroke-linejoin="round">
+          <rect x="330" y="150" width="40" height="292" rx="18" fill="url(#gCylO)"/>
+          <rect x="372" y="168" width="38" height="274" rx="17" fill="url(#gCylA)"/>
+          <path d="M342 150 v-16 h16 v16" fill="#b7bec7"/><path d="M383 168 v-14 h16 v14" fill="#b7bec7"/>
+          <circle cx="350" cy="128" r="9" fill="#d8a640"/><circle cx="391" cy="149" r="8" fill="#d8a640"/>
+          <rect x="336" y="232" width="28" height="9" rx="3" fill="#fff" opacity=".85" stroke="none"/>
+        </g>
+        <!-- machine -->
+        <g class="mach" stroke="#0b0d10" stroke-width="3" stroke-linejoin="round">
+          <rect x="268" y="330" width="118" height="104" rx="12" fill="url(#gMach)"/>
+          <rect x="280" y="344" width="58" height="76" rx="7" fill="#1b1f25"/>
+          <rect x="287" y="352" width="44" height="20" rx="3" fill="#0a1a10" stroke-width="2"/>
+          <text x="309" y="367.5" text-anchor="middle" class="disp">150</text>
+          <circle cx="309" cy="398" r="11" fill="#2c323b" stroke-width="2.5"/><path d="M309 398 l6 -7" stroke="#ffb070" stroke-width="3" stroke-linecap="round"/>
+          <path d="M350 350 h26 M350 360 h26 M350 370 h26 M350 380 h26" stroke="#8a3e0e" stroke-width="3" stroke-linecap="round"/>
+          <path d="M296 330 v-14 a8 8 0 0 1 8 -8 h46 a8 8 0 0 1 8 8 v14" fill="none" stroke-width="7" stroke="#1b1f25"/>
+          <circle cx="290" cy="438" r="7" fill="#1b1f25"/><circle cx="364" cy="438" r="7" fill="#1b1f25"/>
+        </g>
+        <!-- cable from machine to holder -->
+        <path class="cable" d="M285 416 C 240 470, 150 470, 140 420 S 118 330, 104 312" fill="none" stroke="#14171b" stroke-width="7" stroke-linecap="round"/>
+        <!-- workpiece stand -->
+        <g stroke="#0b0d10" stroke-width="3" stroke-linejoin="round">
+          <path d="M22 362 h112 l-6 14 h-100 z" fill="#4a525e"/>
+          <path d="M36 376 l-10 66 M120 376 l10 66 M50 376 v66 M106 376 v66" stroke="#2c323b" stroke-width="6" stroke-linecap="round"/>
+          <rect x="30" y="350" width="44" height="12" rx="2" fill="url(#gSteel)"/>
+          <rect x="78" y="350" width="48" height="12" rx="2" fill="url(#gSteel)"/>
+          <path class="bead" d="M74 351 h4" stroke="#ffb070" stroke-width="5" stroke-linecap="round"/>
+        </g>
+        <!-- welder -->
+        <g class="man" stroke="#0b0d10" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+          <!-- legs & boots -->
+          <path d="M176 300 h30 l-2 112 h-26 z" fill="url(#gPants)"/>
+          <path d="M214 300 h30 l2 112 h-27 z" fill="url(#gPants)"/>
+          <path d="M170 410 h38 v22 h-48 a10 10 0 0 1 10 -22 z" fill="#3b2617"/>
+          <path d="M216 410 h36 a12 12 0 0 1 12 22 h-48 z" fill="#3b2617"/>
+          <path d="M160 432 h48 M216 432 h48" stroke-width="5"/>
+          <!-- right arm (hammer) -->
+          <path d="M250 186 q24 30 22 76 l-22 4 q2 -40 -14 -64 z" fill="url(#gLeather)"/>
+          <g class="hammer"><path d="M262 300 l18 64" stroke-width="6" stroke="#6b4423"/><path d="M266 362 l30 -8 l-2 -9 l-26 4 l-16 2 z" fill="url(#gSteel)"/></g>
+          <path d="M248 262 h26 l2 30 q-14 14 -28 0 z" fill="url(#gGlove)"/>
+          <!-- torso -->
+          <path d="M152 186 q50 -22 104 0 l-6 120 h-92 z" fill="url(#gLeather)"/>
+          <path d="M180 178 l24 30 l24 -30" fill="#e9dcc6"/>
+          <path d="M170 214 q34 -10 68 0 l2 128 q-36 10 -72 0 z" fill="url(#gApron)"/>
+          <path d="M176 222 q28 -8 56 0 M176 334 l-2 -104 M234 334 l2 -104" fill="none" stroke="#d99a5e" stroke-width="1.6" stroke-dasharray="4 4"/>
+          <path d="M160 300 h88" stroke="#3b2617" stroke-width="7"/>
+          <rect x="196" y="294" width="16" height="12" rx="2" fill="#c9a24a" stroke-width="2"/>
+          <!-- left arm holding the electrode holder -->
+          <g class="arm">
+            <path d="M156 190 q-30 24 -40 64 l20 10 q10 -34 34 -54 z" fill="url(#gLeather)"/>
+            <path d="M118 252 q-10 22 -14 40 l22 8 q6 -18 12 -38 z" fill="url(#gLeather)"/>
+            <path d="M100 286 l26 8 l4 22 q-22 10 -36 -6 z" fill="url(#gGlove)"/>
+            <path d="M102 310 l-20 30" stroke="#16191d" stroke-width="10"/>
+            <path d="M96 314 l-10 14" stroke="#c0392b" stroke-width="4"/>
+            <path class="rod" d="M82 340 l-8 10" stroke="#c9ccd1" stroke-width="3"/>
+          </g>
+          <!-- head + helmet -->
+          <path d="M184 176 h40 v12 h-40 z" fill="#c98d5e"/>
+          <path d="M160 128 q2 -58 52 -60 q50 2 50 58 q0 48 -36 58 l-44 2 q-24 -10 -22 -58 z" fill="url(#gHelm)"/>
+          <path d="M166 104 q16 -26 44 -30" fill="none" stroke="#5b6470" stroke-width="3"/>
+          <rect class="lens" x="164" y="114" width="40" height="22" rx="5" fill="url(#gLens)" stroke-width="3"/>
+          <path d="M170 118 l10 0" stroke="#bff5d6" stroke-width="2.5" opacity=".8"/>
+          <circle cx="246" cy="130" r="9" fill="#2c323b"/><circle cx="246" cy="130" r="3.5" fill="#ff8a2b" stroke="none"/>
+          <path d="M214 76 q22 6 36 28" fill="none" stroke="#ff8a2b" stroke-width="5"/>
+          <path d="M219 82 q16 6 25 20" fill="none" stroke="#ffd166" stroke-width="2.5"/>
+        </g>
+        <!-- arc -->
+        <g class="arc"><circle cx="76" cy="350" r="34" fill="url(#gArc)"/><circle cx="76" cy="350" r="7" fill="#fff"/></g>
+        <g id="sparks"></g>
+      </svg>
+    </div>
+    <div class="intro-text">
+      <div class="intro-kicker">قسم اللحام — التعليم الثانوي الصناعي</div>
+      <h1 class="intro-title"><span class="l1">مرحباً بكم في</span><span class="l2"><span class="fill">معمل محاكاة عمليات اللحام الافتراضي</span><i class="torch-dot"></i></span></h1>
+      <p class="intro-sub">قوس كهربي • غاز وقطع • كربون • ثاني أكسيد الكربون • TIG • MIG</p>
+      <div class="intro-go">
+        <div class="intro-load"><div class="spin"></div><small>بنجهّز المعمل…</small></div>
+        <button type="button" id="intro-start" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>ادخل المعمل</button>
+      </div>
+      <div class="intro-credit" dir="ltr"><span>Designed &amp; developed by</span><b>Mohamed-Eldawly</b></div>
+    </div>
+  </div>
+  <div class="intro-flash" aria-hidden="true"></div>
+</div>
 <div id="credit" dir="ltr" aria-label="Designed and developed by Mohamed-Eldawly">Designed &amp; developed by <b>Mohamed-Eldawly</b></div>
 <script src="app.js"></script>
 </body>

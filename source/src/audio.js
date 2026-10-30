@@ -50,6 +50,15 @@ export class ArcAudio {
     else if (name === 'chip') noise(0.06, 3500, 3, 0.4);
     else if (name === 'hiss') noise(0.7, 5000, 0.6, 0.25);
     else if (name === 'pop') { noise(0.18, 300, 0.8, 0.9); tone(90, 0.2, 'sine', 0.2, 40); }
+    else if (name === 'intro') {   // cinematic sting: arc strike crackle + whoosh + low boom + bright chord
+      const n = c.createBufferSource(), len = Math.ceil(c.sampleRate * 1.6), b = c.createBuffer(1, len, c.sampleRate), x = b.getChannelData(0);
+      for (let i = 0; i < len; i++) { const k = i / len; x[i] = ((Math.random() * 2 - 1) * 0.5 + (Math.random() < 0.01 ? (Math.random() * 2 - 1) * 2.5 : 0)) * Math.pow(1 - k, 1.6); }
+      n.buffer = b; const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.7; bp.frequency.setValueAtTime(5200, t); bp.frequency.exponentialRampToValueAtTime(700, t + 1.4);
+      const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.9, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      n.connect(bp).connect(g).connect(out); n.start(t);
+      tone(70, 1.6, 'sine', 0.45, 34); tone(140, 0.9, 'triangle', 0.08, 70);
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => { const o = c.createOscillator(), og = c.createGain(); o.type = 'sine'; o.frequency.value = f; og.gain.setValueAtTime(0.0001, t + 0.25 + i * 0.06); og.gain.exponentialRampToValueAtTime(0.05, t + 0.35 + i * 0.06); og.gain.exponentialRampToValueAtTime(0.0001, t + 2.6); o.connect(og).connect(out); o.start(t + 0.25 + i * 0.06); o.stop(t + 2.7); });
+    }
     else if (name === 'clunk') { noise(0.06, 600, 1.5, 0.5); tone(140, 0.12, 'triangle', 0.12, 80); }
   }
   click() {
