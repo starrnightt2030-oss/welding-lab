@@ -171,7 +171,7 @@ export function startApp(STATIONS) {
     if (st === 'fitup') clean.showRust(!isCutTask());
     if (st !== 'weld' && st !== 'fitup' && clean) clean.showRust(false);
     E.controls.maxPolarAngle = st === 'weld' || st === 'inspect' || st === 'fitup' ? 2.7 : 1.52;   // overhead work is watched from below
-    if (camFill) camFill.intensity = st === 'weld' || st === 'inspect' || st === 'fitup' ? 0.9 : 0;
+    if (camFill) camFill.intensity = st === 'weld' ? 0.45 : st === 'inspect' || st === 'fitup' ? 0.55 : 0;
     E.poke(st === 'inspect' ? 9000 : 2500);
     if (st === 'inspect') {
       if (!state.report) state.report = sim.proc ? sim.evaluate() : null; s.inspectEnter && s.inspectEnter(ctx);

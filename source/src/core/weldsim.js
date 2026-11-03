@@ -67,6 +67,7 @@ export class WeldSim {
   configure(proc, settings) { this.proc = proc; this.settings = settings; this.reset(); }
 
   reset() {
+    this._sag = 0;
     const p = this.proc;
     this.ripples = []; this.samples = [];
     this.events = { stuck: 0, outs: 0, strikes: 0, lost: 0, early: 0 };
@@ -204,7 +205,8 @@ export class WeldSim {
     if (ex && g && p.kind !== 'cut' && id0) {
       // molten metal flows with gravity when the pool is too hot/slow for the position
       const slow = THREE.MathUtils.clamp(((id0.speed[0] + id0.speed[1]) / 2) / Math.max(0.5, s.speed) - 0.85, 0, 2.5);
-      zOff += g.z * slow * w * 0.35; hk *= 1 + Math.max(0, g.y) * slow * 0.35;
+      this._sag = (this._sag ?? 0) * 0.85 + slow * 0.15;   // the pool sags gradually, not in steps
+      zOff += g.z * this._sag * w * 0.35; hk *= 1 + Math.max(0, g.y) * this._sag * 0.35;
       if (Math.abs(g.x) > 0.6 && slow > 0.4 && Math.random() < 0.35) this.addRoll(x, JOINT.z, w, h * (1 + slow * 0.4));   // vertical: sagging laps
       if (g.y > 0.6 && slow > 0.3 && Math.random() < 0.3) this.addRoll(x, JOINT.z + (Math.random() - 0.5) * w * 0.4, w * 0.3, h * 1.6);   // overhead: drops
     }
