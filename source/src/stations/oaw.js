@@ -61,35 +61,61 @@ const st = { task: 'weld', valveO: 0, valveA: 0, pO: 0, pA: 0, tA: 0, tO: 0, lit
 const asm = {};
 const CYL_O = V3(-0.86, 0.05, -0.1), CYL_A = V3(-0.53, 0.05, -0.1);
 
-function torchTipDir(cut) { return cut ? V3(0, -1, 0) : V3(0.86, -0.5, 0).normalize(); }
+function torchTipDir(cut) { return cut ? torch.userData.dirC.clone() : torch.userData.dirW.clone(); }
 
 function buildTorch(M) {
-  const g = new THREE.Group(); // handle along +X, tip at the +X end
-  const chrome = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.2, metalness: 1, bumpMap: Textures.knurl().bumpMap, bumpScale: 0.8 });
-  const handle = mesh(new THREE.CylinderGeometry(0.012, 0.013, 0.16, 24), chrome); handle.rotation.z = Math.PI / 2; handle.position.x = -0.08; g.add(handle);
-  const body = mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.03, 20), M.brass); body.rotation.z = Math.PI / 2; body.position.x = -0.17; g.add(body);
+  // oxy-acetylene blowpipe: knurled handle, rear valve block with red (C2H2) / blue (O2) needle valves,
+  // hose nipples, mixer nut, bent copper neck + tip; or the cutting attachment (90° head, preheat valve, cutting-O2 lever)
+  const g = new THREE.Group();   // tip side towards +X, hoses at the -X end
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xd4d9de, roughness: 0.22, metalness: 1, bumpMap: Textures.knurl().bumpMap, bumpScale: 1.2 });
+  const brass = M.brass, copper = M.copper;
+  const cylX = (r1, r2, l, mat, x, y = 0, z = 0, seg = 24) => { const m = mesh(new THREE.CylinderGeometry(r1, r2, l, seg), mat); m.rotation.z = Math.PI / 2; m.position.set(x, y, z); g.add(m); return m; };
+  cylX(0.0115, 0.0115, 0.15, chrome, -0.145);                                   // knurled handle
+  [-0.215, -0.075].forEach(x => cylX(0.0128, 0.0128, 0.008, brass, x));          // end ferrules
+  const block = mesh(new RoundedBoxGeometry(0.05, 0.028, 0.034, 3, 0.006), brass); block.position.set(-0.245, -0.002, 0); g.add(block);
   const kns = {};
-  [[0x1d5fb8, 1], [0xb3261e, -1]].forEach(([c, s]) => {
-    const kn = kns[s > 0 ? 'O' : 'A'] = mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.012, 16), new THREE.MeshStandardMaterial({ color: c, roughness: 0.4 }));
-    kn.position.set(-0.17, 0, s * 0.02); kn.rotation.x = Math.PI / 2; g.add(kn);
-    const nip = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.03, 10), M.brass); nip.rotation.z = Math.PI / 2; nip.position.set(-0.2, 0, s * 0.007); g.add(nip);
+  [['O', 0x1d5fb8, 1], ['A', 0xb3261e, -1]].forEach(([k, c, sz]) => {
+    const v = new THREE.Group(); v.position.set(-0.245, -0.01, sz * 0.017); v.rotation.x = sz * 0.75; g.add(v);   // needle valve stem angled down/out
+    const stem = mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.02, 10), brass); stem.position.y = -0.01; v.add(stem);
+    const kn = kns[k] = new THREE.Group(); kn.position.y = -0.022; v.add(kn);
+    const cap = mesh(new THREE.CylinderGeometry(0.0105, 0.0105, 0.011, 20), new THREE.MeshStandardMaterial({ color: c, roughness: 0.38 })); kn.add(cap);
+    for (let i = 0; i < 14; i++) { const r = mesh(new THREE.BoxGeometry(0.002, 0.011, 0.0025), cap.material); const a = i / 14 * Math.PI * 2; r.position.set(Math.cos(a) * 0.0105, 0, Math.sin(a) * 0.0105); r.rotation.y = -a; kn.add(r); }
+    const dot = mesh(new THREE.BoxGeometry(0.003, 0.001, 0.008), new THREE.MeshStandardMaterial({ color: 0xffffff })); dot.position.set(0, -0.006, 0.004); kn.add(dot);
+    // hose nipple + nut at the back
+    const nip = cylX(0.0045, 0.0045, 0.032, brass, -0.285, -0.004, sz * 0.008, 12);
+    const nut = mesh(new THREE.CylinderGeometry(0.0075, 0.0075, 0.012, 6), new THREE.MeshStandardMaterial({ color: c, roughness: 0.4, metalness: 0.3 })); nut.rotation.z = Math.PI / 2; nut.position.set(-0.272, -0.004, sz * 0.008); g.add(nut);
+    void nip;
   });
-  const mixer = mesh(new THREE.CylinderGeometry(0.009, 0.011, 0.04, 16), M.brass); mixer.rotation.z = Math.PI / 2; mixer.position.x = 0.02; g.add(mixer);
-  // welding neck (bent) + copper tip
+  const mixNut = cylX(0.0145, 0.0145, 0.02, brass, -0.06, 0, 0, 6);    // hex mixer coupling
+  void mixNut;
+  // ---- welding neck + tip
   const weld = new THREE.Group();
-  const neck = new THREE.CatmullRomCurve3([V3(0.04, 0, 0), V3(0.1, 0, 0), V3(0.13, -0.008, 0), V3(0.155, -0.023, 0)]);
-  weld.add(mesh(new THREE.TubeGeometry(neck, 20, 0.0045, 10), M.copper));
-  const tip = mesh(new THREE.CylinderGeometry(0.0025, 0.0048, 0.025, 14), M.copper); tip.position.set(0.166, -0.03, 0); tip.rotation.z = Math.PI / 2 + 0.52; weld.add(tip);
+  const bendAt = V3(0.075, 0, 0), dir = V3(Math.cos(0.6), -Math.sin(0.6), 0);
+  const neckPts = [V3(-0.05, 0, 0), V3(0.03, 0, 0), bendAt, bendAt.clone().addScaledVector(dir, 0.04)];
+  weld.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(neckPts, false, 'catmullrom', 0.2), 40, 0.0045, 12), copper));
+  const tipBase = bendAt.clone().addScaledVector(dir, 0.04);
+  const tip = mesh(new THREE.CylinderGeometry(0.0026, 0.0052, 0.026, 18), copper); tip.position.copy(tipBase).addScaledVector(dir, 0.013);
+  tip.quaternion.setFromUnitVectors(V3(0, -1, 0), dir); weld.add(tip);
+  const tipNut = mesh(new THREE.CylinderGeometry(0.0062, 0.0062, 0.008, 6), brass); tipNut.position.copy(tipBase); tipNut.quaternion.copy(tip.quaternion); weld.add(tipNut);
+  const tipW = tipBase.clone().addScaledVector(dir, 0.0265);
   g.add(weld);
-  // cutting head: two tubes + 90° head + oxygen lever
+  // ---- cutting attachment
   const cut = new THREE.Group();
-  cut.add(mesh(new THREE.TubeGeometry(new THREE.LineCurve3(V3(0.04, 0.004, 0), V3(0.17, 0.004, 0)), 4, 0.0045, 10), M.copper));
-  cut.add(mesh(new THREE.TubeGeometry(new THREE.LineCurve3(V3(0.04, -0.006, 0), V3(0.17, -0.006, 0)), 4, 0.0035, 10), M.copper));
-  const head = mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.03, 16), M.brass); head.position.set(0.18, -0.008, 0); cut.add(head);
-  const ctip = mesh(new THREE.CylinderGeometry(0.0045, 0.0065, 0.025, 16), M.copper); ctip.position.set(0.18, -0.035, 0); cut.add(ctip);
-  const lever = mesh(new RoundedBoxGeometry(0.1, 0.006, 0.014, 2, 0.002), M.steel); lever.position.set(0.05, 0.02, 0); lever.rotation.z = -0.08; cut.add(lever);
+  const cbody = mesh(new RoundedBoxGeometry(0.05, 0.026, 0.03, 3, 0.006), brass); cbody.position.set(-0.025, 0.002, 0); cut.add(cbody);
+  const pv = new THREE.Group(); pv.position.set(-0.03, 0.002, 0.018); cut.add(pv);   // preheat oxygen valve
+  const pvk = mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.01, 18), new THREE.MeshStandardMaterial({ color: 0x1d5fb8, roughness: 0.4 })); pvk.rotation.x = Math.PI / 2; pvk.position.z = 0.008; pv.add(pvk);
+  const tube = (y, r) => cut.add(mesh(new THREE.TubeGeometry(new THREE.LineCurve3(V3(0.0, y, 0), V3(0.17, y, 0)), 4, r, 10), copper));
+  tube(0.0075, 0.0042); tube(-0.004, 0.0034); tube(-0.004 - 0.0075, 0.0028);
+  const head = mesh(new THREE.CylinderGeometry(0.0105, 0.0105, 0.034, 20), brass); head.position.set(0.18, -0.004, 0); cut.add(head);
+  const hnut = mesh(new THREE.CylinderGeometry(0.0095, 0.0095, 0.008, 6), brass); hnut.position.set(0.18, -0.025, 0); cut.add(hnut);
+  const noz = mesh(new THREE.CylinderGeometry(0.0042, 0.0068, 0.022, 18), copper); noz.position.set(0.18, -0.04, 0); cut.add(noz);
+  // cutting-oxygen lever hinged at the rear, spring under it
+  const lever = new THREE.Group(); lever.position.set(0.0, 0.019, 0); cut.add(lever);
+  const lb = mesh(new RoundedBoxGeometry(0.13, 0.005, 0.014, 2, 0.002), M.steel); lb.position.x = 0.065; lb.rotation.z = -0.07; lever.add(lb);
+  const spring = new THREE.Curve(); spring.getPoint = t => V3(0.03 + Math.cos(t * 40) * 0.003, -0.002 - t * 0.008, Math.sin(t * 40) * 0.003); lever.add(mesh(new THREE.TubeGeometry(spring, 120, 0.0007, 5), M.steel));
   cut.visible = false; g.add(cut);
-  g.userData = { knO: kns.O, knA: kns.A, weld, cut, lever, tipW: V3(0.178, -0.037, 0), tipC: V3(0.18, -0.048, 0), anchor: V3(-0.215, 0, 0) };
+  g.userData = { knO: kns.O, knA: kns.A, weld, cut, lever, tipW, tipC: V3(0.18, -0.051, 0), dirW: dir.clone(), dirC: V3(0, -1, 0), anchor: V3(-0.3, -0.004, 0) };
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return g;
 }
 
@@ -136,7 +162,7 @@ S.build = ctx => {
   hoseO = new Cable({ rubber: hoseMat(0x1f57a8) }, 0.0068); hoseA = new Cable({ rubber: hoseMat(0xa52a22) }, 0.0068);
   R.add(hoseO.mesh, hoseA.mesh);
   torch = buildTorch(M); R.add(torch);
-  flame = buildFlame(); torch.add(flame);
+  flame = buildFlame(); torch.add(flame); S._flame = flame; S._torch = torch;
   lighter = new THREE.Group();
   const cup = mesh(new THREE.CylinderGeometry(0.018, 0.014, 0.03, 18, 1, true), M.darkSteel); cup.position.y = 0.04; lighter.add(cup);
   const arm = mesh(new THREE.TorusGeometry(0.04, 0.0025, 8, 20, Math.PI), M.steel); arm.rotation.z = Math.PI / 2; arm.position.set(-0.03, 0.03, 0); lighter.add(arm);
@@ -210,13 +236,13 @@ function updateGauges() {
   regO.userData.lp.set(asm.regO && st.valveO ? st.pO : 0);
   regA.userData.lp.set(asm.regA && st.valveA ? st.pA : 0);
   regO.userData.screw.rotation.z = -st.pO * 0.6; regA.userData.screw.rotation.z = -st.pA * 2.4;
-  if (torch && torch.userData.knO) { torch.userData.knO.rotation.y = -st.tO * Math.PI * 2.5; torch.userData.knA.rotation.y = -st.tA * Math.PI * 2.5; }
+  if (torch && torch.userData.knO) { torch.userData.knO.rotation.y = -st.tO * Math.PI * 2.5; torch.userData.knA.rotation.y = st.tA * Math.PI * 2.5; if (torch.userData.lever) torch.userData.lever.rotation.z = (ctxRef && ctxRef.state.stage === 'weld' && ctxRef.state.weld.aux && st.task === 'cut') ? -0.12 : 0; }
   cylO.userData.valve.rotation.y = -st.valveO * Math.PI * 2; cylA.userData.valve.rotation.y = -st.valveA * Math.PI * 0.5;
 }
 function flameState() {
   if (!st.lit) return null;
   const ratio = st.tA > 0 ? (st.tO * (st.pO > 0 ? 1 : 0)) / st.tA : 0;
-  return { ratio: st.tO === 0 ? 0.45 : ratio, size: 0.5 + st.tA * 0.6 };
+  return { ratio, size: 0.35 + st.tA * 1.6 };
 }
 function applyFlame(cut) {
   const f = flameState();
@@ -225,7 +251,7 @@ function applyFlame(cut) {
   const tipL = cut ? torch.userData.tipC : torch.userData.tipW;
   flame.position.copy(tipL);
   flame.quaternion.setFromUnitVectors(V3(0, -1, 0), torchTipDir(cut));
-  flame.userData.set(f.ratio, f.size, cut && ctxRef.state.weld.aux && ctxRef.state.stage === 'weld');
+  flame.userData.set(f.ratio, f.size, cut && ctxRef.state.weld.aux && ctxRef.state.stage === 'weld', cut);
 }
 
 // ----- explore
@@ -505,6 +531,7 @@ function sootFrame(dt) {
     if (q.t <= 0) q.sp.visible = false;
   }
 }
+S.animating = () => flame && flame.visible;
 S.frame = (ctx, dt) => {
   sootFrame(dt);
   if (flame.visible) flame.userData.flicker(performance.now() / 1000);
@@ -607,18 +634,20 @@ const _q = new THREE.Quaternion(), _m1 = new THREE.Matrix4(), _m2 = new THREE.Ma
 function orientTorch(dirWorld, cut) {
   // map local tip direction → world dir, keeping the handle up and behind the flame
   const dl = torchTipDir(cut);
-  const ul = V3(-1, 0.25, 0); ul.sub(dl.clone().multiplyScalar(ul.dot(dl))).normalize();
+  const ul = V3(-1, 0, 0); ul.sub(dl.clone().multiplyScalar(ul.dot(dl))).normalize();
   const dw = dirWorld.clone().normalize();
-  const uw = V3(-0.75, 0.55, 0.35); uw.sub(dw.clone().multiplyScalar(uw.dot(dw))).normalize();
+  const uw = cut ? V3(-0.25, 0.42, -0.87) : V3(-0.75, 0.55, 0.2); uw.sub(dw.clone().multiplyScalar(uw.dot(dw))).normalize();
   _m1.makeBasis(dl, ul, dl.clone().cross(ul)); _m2.makeBasis(dw, uw, dw.clone().cross(uw));
   _m2.multiply(_m1.transpose());
   torch.quaternion.setFromRotationMatrix(_m2);
 }
 S.weldPose = (ctx, tip, dt) => {
   const cut = st.task === 'cut', w = ctx.state.weld;
+  if (torch.userData.lever) torch.userData.lever.rotation.z = cut && w.aux ? -0.12 : 0;
   const a = THREE.MathUtils.degToRad(ctx.state.angle);
   // flame points towards travel direction (forehand) → torch body is behind (−X)
-  const toPuddle = V3(Math.cos(a), -Math.sin(a), -0.15).normalize();
+  // welding: forehand at the set angle; cutting: nozzle square to the plate with a slight lead in the travel direction
+  const toPuddle = cut ? V3(Math.cos(a) * 0.6, -1, 0).normalize() : V3(Math.cos(a), -Math.sin(a), -0.08).normalize();
   orientTorch(toPuddle, cut);
   const tipL = cut ? torch.userData.tipC : torch.userData.tipW;
   const coneL = 0.005;

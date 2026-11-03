@@ -25,11 +25,17 @@ export class WeldSim {
     const ball = new THREE.SphereGeometry(1, 10, 8);
     this.spatter = new THREE.InstancedMesh(ball, new THREE.MeshStandardMaterial({ color: 0x55565a, roughness: 0.45, metalness: 0.85 }), 500);
     this.pores = new THREE.InstancedMesh(ball, new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.9 }), 240);
-    this.under = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x1c1e22, roughness: 0.6, metalness: 0.6 }), 500);
+    this.under = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x08090a, roughness: 0.85, metalness: 0.2 }), 700);
+    // visible defect geometry: pore rims, overlap rolls past the toes, cold-lap slits, crater cracks
+    const rimGeo = new THREE.TorusGeometry(1, 0.32, 6, 16); rimGeo.rotateX(Math.PI / 2);
+    this.poreRim = new THREE.InstancedMesh(rimGeo, new THREE.MeshStandardMaterial({ color: 0xb9bcc0, roughness: 0.35, metalness: 0.9 }), 240);
+    this.rolls = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: 0x9da1a6, roughness: 0.4, metalness: 0.85 }), 500);
+    this.cracks = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x050505 }));
+    this.cracks.frustumCulled = false; this.group.add(this.cracks);
     // dark kerf for cutting
     this.kerf = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1 }), MAX_RIPPLES);
     this.dross = new THREE.InstancedMesh(ball, new THREE.MeshStandardMaterial({ color: 0x2c2420, roughness: 0.6, metalness: 0.4 }), 400);
-    this.all = [this.bead, this.glow, this.slag, this.spatter, this.pores, this.under, this.kerf, this.dross];
+    this.all = [this.bead, this.glow, this.slag, this.spatter, this.pores, this.under, this.kerf, this.dross, this.poreRim, this.rolls];
     this.all.forEach(m => { m.count = 0; m.frustumCulled = false; this.group.add(m); });
 
     this.light = new THREE.PointLight(0xd6ecff, 0, 1.5, 2);
@@ -64,7 +70,8 @@ export class WeldSim {
     const p = this.proc;
     this.ripples = []; this.samples = [];
     this.events = { stuck: 0, outs: 0, strikes: 0, lost: 0, early: 0 };
-    this.evPos = []; this.evSeen = {}; this.lastInX = JOINT.x0;
+    this.evPos = []; this.evSeen = {}; this.lastInX = JOINT.x0; this.craters = []; this.crackPts = []; this.dirty = 0;
+    if (this.cracks) { this.cracks.geometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3)); }
     this.on = false; this.stuck = false; this.lastX = null;
     this.progress = JOINT.x0; this.gap = 0; this.grace = 0;
     this.speed = 0; this.speedEMA = 0; this.time = 0;
@@ -107,6 +114,7 @@ export class WeldSim {
     for (let i = 0; i < this.heat.length; i++) this.heat[i] *= Math.pow(0.55, dt);
 
     if (!input.pressing) {
+      if (this.on && p.kind !== 'cut' && p.ideal && this.speed > p.ideal.speed[0] * 0.55 && this.ripples.length > 8) this.addCrater(Math.min(this.progress - 0.0008, JOINT.x1));
       if (this.on) { this.on = false; this.setVisible(false); if (p.kind === 'arc') out.msg = { t: 'info', s: p.pauseMsg || 'توقفت. أكمل من آخر نقطة.' }; }
       this.stuck = false; this.lastX = null;
     } else if (this.stuck) {
@@ -208,8 +216,8 @@ export class WeldSim {
     this.inst(this.bead, i, x, JOINT.y, r.z, w * 0.42, h, w * 0.5);
     this.inst(this.glow, i, x, JOINT.y, r.z, w * 0.44, h * 1.04, w * 0.52);
     this.bead.count = this.glow.count = i + 1;
-    const base = p.bead?.color || [0.75, 0.74, 0.72];
-    this.bead.setColorAt(i, new THREE.Color(...base));
+    const base = p.bead?.color || [0.75, 0.74, 0.72], rip = 0.9 + 0.1 * Math.sin(i * 1.9);   // chevron ripple shading
+    this.bead.setColorAt(i, new THREE.Color(base[0] * rip, base[1] * rip, base[2] * rip));
     const hot = p.bead?.hot || [3, 1.3, 0.35];
     this.glow.setColorAt(i, new THREE.Color(...hot));
     this.bead.instanceMatrix.needsUpdate = this.glow.instanceMatrix.needsUpdate = true;
@@ -218,6 +226,27 @@ export class WeldSim {
     if (f.spatter && Math.random() < f.spatter) this.addSpatter(x, 1 + Math.floor(Math.random() * 2));
     if (f.pore && Math.random() < f.pore) this.addPore(x, r.z, w, h);
     if (f.undercut && Math.random() < f.undercut) this.addUndercut(x, r.z, w);
+    // generic, process-independent defect geometry from how the student moved
+    const id = p.ideal;
+    if (id && s.speed > 0.2 && s.speed < id.speed[0] * 0.7 && Math.random() < 0.55) this.addRoll(x, r.z, w, h);
+    if (id && s.dist < id.dist[0] * 0.8 && Math.random() < 0.4) this.addColdLap(x, r.z, w);
+    if (this.dirty && Math.random() < this.dirty * 0.22) this.addPore(x, r.z, w, h);
+  }
+  addRoll(x, z, w, h) {   // overlap: metal rolls over the plate past the toe without fusing
+    [-1, 1].forEach(sd => { const i = this.rolls.count; if (i >= 500) return; this.inst(this.rolls, i, x, JOINT.y + h * 0.25, z + sd * (w * 0.5 + 0.0007), 0.0009, h * 0.55, 0.0011); this.rolls.count++; });
+    this.rolls.instanceMatrix.needsUpdate = true;
+  }
+  addColdLap(x, z, w) {   // lack of fusion at the toes: a dark slit between bead and plate
+    [-1, 1].forEach(sd => { const i = this.under.count; if (i >= 700) return; this.inst(this.under, i, x, JOINT.y + 0.0001, z + sd * (w * 0.46), 0.0012, 0.0002, 0.0004); this.under.count++; });
+    this.under.instanceMatrix.needsUpdate = true;
+  }
+  addCrater(x) {   // abrupt stop: crater with a star crack
+    const r = this.ripples.filter(q => Math.abs(q.x - x) < 0.0015).pop(); if (!r) return;
+    const i = this.pores.count; if (i < 240) { this.inst(this.pores, i, x, JOINT.y + r.h * 0.6, r.z, r.w * 0.3, r.h * 0.35, r.w * 0.3); this.pores.count++; this.pores.instanceMatrix.needsUpdate = true; }
+    const pts = (this.crackPts = this.crackPts || []), y = JOINT.y + r.h * 0.98 + 0.00005;
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + Math.random() * 0.4, L = r.w * (0.25 + Math.random() * 0.25); let px = x, pz = r.z; for (let j = 0; j < 3; j++) { const nx = px + Math.cos(a + (Math.random() - 0.5) * 0.6) * L / 3, nz = pz + Math.sin(a + (Math.random() - 0.5) * 0.6) * L / 3; pts.push(px, y, pz, nx, y, nz); px = nx; pz = nz; } }
+    this.cracks.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); this.cracks.visible = true;
+    (this.craters = this.craters || []).push(x);
   }
 
   inst(mesh, i, x, y, z, sx, sy, sz) {
@@ -233,14 +262,14 @@ export class WeldSim {
       this.spatter.count++; this.spatter.instanceMatrix.needsUpdate = true;
     }
   }
-  addPore(x, z, w, h) {
+  addPore(x, z, w, h) {   // gas pore: dark pit with a shiny rim on the crown
     const i = this.pores.count; if (i >= 240) return;
-    const r = (0.35 + Math.random() * 0.4) / 1000;
-    this.inst(this.pores, i, x, JOINT.y + h * 0.92, z + (Math.random() - 0.5) * w * 0.4, r, r * 0.5, r);
-    this.pores.count++; this.pores.instanceMatrix.needsUpdate = true;
+    const r = (0.45 + Math.random() * 0.6) / 1000, pz = z + (Math.random() - 0.5) * w * 0.45;
+    this.inst(this.pores, i, x, JOINT.y + h * 0.9, pz, r, r * 0.6, r); this.pores.count++; this.pores.instanceMatrix.needsUpdate = true;
+    const k = this.poreRim.count; if (k < 240) { this.inst(this.poreRim, k, x, JOINT.y + h * 0.93, pz, r * 1.05, r * 0.9, r * 1.05); this.poreRim.count++; this.poreRim.instanceMatrix.needsUpdate = true; }
   }
-  addUndercut(x, z, w) {
-    [-1, 1].forEach(s => { const i = this.under.count; if (i >= 500) return; this.inst(this.under, i, x, JOINT.y + 0.00002, z + s * (w * 0.5 + 0.0004), 0.0012, 0.00008, 0.0007); this.under.count++; });
+  addUndercut(x, z, w) {   // groove melted into the plate along both toes
+    [-1, 1].forEach(s => { const i = this.under.count; if (i >= 700) return; this.inst(this.under, i, x, JOINT.y + 0.00008, z + s * (w * 0.5 + 0.00045), 0.0013, 0.00012, 0.0009); this.under.count++; });
     this.under.instanceMatrix.needsUpdate = true;
   }
 
@@ -450,8 +479,9 @@ export class WeldSim {
     const count = k => bins.filter(b => b.issues && b.issues.includes(k)).length;
     const ctx = { bins, count, events: this.events, settings: this.settings, coverage, sim: this, AR };
     const defects = p.defects ? p.defects(ctx) : [];
+    if (this.craters && this.craters.length && p.kind !== 'cut') defects.push({ name: 'حفرة وشرخ في نهاية الخط', en: 'Crater crack', cause: 'رفعت الأداة فجأة وهي تتحرك ' + AR(this.craters.length) + ' مرة، فبقيت حفرة تنكمش وتتشقق.', fix: 'قبل رفع الأداة توقّف لحظة أو ارجع قليلًا للخلف لملء الحفرة، ثم ارفع.', spots: this.craters.map(x => ({ x0: x - 0.004, x1: x + 0.004 })) });
     if (coverage < 0.95) defects.push({ name: p.kind === 'cut' ? 'قطع غير مكتمل' : 'خط غير مكتمل', en: 'Incomplete', cause: (p.kind === 'cut' ? 'القطع' : 'الخط') + ' لم تغطِّ الطول كله (' + AR(Math.round(coverage * 100)) + '٪).', fix: 'أكمل حتى نهاية الخط.' });
-    defects.forEach(d => { d.spots = this.localize(d, bins, coverage); });
+    defects.forEach(d => { if (!d.spots) d.spots = this.localize(d, bins, coverage); });
     const W = avg(this.ripples.map(r => r.w)) * 1000, H = avg(this.ripples.map(r => r.h)) * 1000;
     const grade = total >= 90 ? 'ممتاز' : total >= 75 ? 'جيد جداً' : total >= 60 ? 'جيد' : total >= 50 ? 'مقبول' : 'يحتاج إلى تدريب';
     return { total, grade, crit, defects, bins, coverage, width: W, height: H, penetration: p.penetration ? p.penetration(this.settings) : 1, avgSpeed: avg(sv), avgDist: avg(dv), kind: p.kind, distName: p.distName, setNote: set.note };

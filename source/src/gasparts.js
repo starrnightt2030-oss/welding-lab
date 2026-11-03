@@ -127,37 +127,66 @@ export function buildFlowmeter(M, o = {}) {
 }
 
 // ---------- flame (oxy-acetylene). Built along local -Y (pointing out of the torch tip).
+// Oxy-acetylene flame: lathe-shaped layers with per-vertex colour/alpha (additive), sized by the gas flows.
+function flameLayer(profile, colorAt, seg = 28) {
+  const N = 40, pts = [];
+  for (let i = 0; i <= N; i++) { const t = i / N; pts.push(new THREE.Vector2(Math.max(0.0001, profile(t)), -t)); }
+  const geo = new THREE.LatheGeometry(pts, seg);
+  const pos = geo.attributes.position, col = new Float32Array(pos.count * 4);
+  for (let i = 0; i < pos.count; i++) { const c = colorAt(-pos.getY(i)); col.set(c, i * 4); }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+  m.frustumCulled = false; return m;
+}
+const mixC = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+const grad = stops => t => { for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) { const [t0, c0] = stops[i - 1], [t1, c1] = stops[i]; return mixC(c0, c1, (t - t0) / (t1 - t0)); } return stops[stops.length - 1][1]; };
 export function buildFlame() {
-  const g = new THREE.Group();
-  const add = (geo, color, opacity) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide })); g.add(m); return m; };
-  const cone = new THREE.ConeGeometry(1, 1, 24, 1, true); cone.translate(0, -0.5, 0); cone.rotateX(Math.PI);
-  // geometry now spans y 0..-1 with the tip at -1
-  const inner = add(cone.clone(), new THREE.Color(3.2, 4.2, 6.5), 0.95);
-  const feather = add(cone.clone(), new THREE.Color(1.6, 1.7, 2.2), 0.35);
-  const env = add(cone.clone(), new THREE.Color(0.25, 0.45, 1.6), 0.28);
-  const envTip = add(cone.clone(), new THREE.Color(1.6, 0.6, 0.15), 0.18);
-  const jet = add(new THREE.CylinderGeometry(1, 1, 1, 12, 1, true).translate(0, -0.5, 0), new THREE.Color(3, 3.4, 4), 0.55);
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: Textures.glowSprite(), color: new THREE.Color(0.6, 0.8, 1.6), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false }));
-  glow.scale.setScalar(0.02); g.add(glow);
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const coneP = t => Math.pow(Math.sin(Math.min(1, t * 2.2 + 0.08) * Math.PI / 2), 0.7) * (1 - t);     // round shoulder, sharp tip
+  const envP = t => Math.pow(Math.sin(Math.min(1, t * 3 + 0.05) * Math.PI / 2), 0.8) * Math.pow(1 - t, 0.55);
+  const inner = flameLayer(coneP, grad([[0, [1.8, 2.3, 3.0, 1]], [0.85, [1.3, 1.9, 2.9, 1]], [1, [0.8, 1.3, 2.6, 0.8]]]));
+  const feather = flameLayer(envP, grad([[0, [1.3, 1.35, 1.6, 0.8]], [0.6, [1.1, 1.15, 1.45, 0.55]], [1, [0.6, 0.7, 1.2, 0]]]));
+  const env = flameLayer(envP, grad([[0, [0.25, 0.5, 1.7, 0.7]], [0.35, [0.45, 0.4, 1.45, 0.5]], [0.7, [0.95, 0.45, 0.6, 0.3]], [1, [1.2, 0.5, 0.12, 0]]]));
+  const yellow = flameLayer(t => envP(t) * (1 + Math.sin(t * 9) * 0.06), grad([[0, [0.9, 0.55, 0.2, 0.55]], [0.25, [1.6, 0.85, 0.22, 0.6]], [0.75, [1.3, 0.5, 0.1, 0.4]], [1, [0.25, 0.1, 0.03, 0]]]));
+  const jet = flameLayer(t => 0.6 * (1 - t * 0.3), grad([[0, [2.2, 2.4, 2.8, 0.85]], [0.6, [1.4, 1.7, 2.3, 0.55]], [1, [0.8, 0.9, 1.3, 0]]]), 14);
+  body.add(env, feather, inner, yellow, jet);
+  // preheat ring for the cutting nozzle: six small inner cones around the centre hole
+  const ring = new THREE.Group(); const ringCones = [];
+  for (let i = 0; i < 6; i++) { const c = flameLayer(coneP, grad([[0, [1.4, 1.9, 2.7, 0.95]], [1, [0.6, 1.0, 2.2, 0.5]]]), 12); const a = i / 6 * Math.PI * 2; c.position.set(Math.cos(a) * 0.0032, 0, Math.sin(a) * 0.0032); ring.add(c); ringCones.push(c); }
+  body.add(ring);
+  const light = new THREE.PointLight(0x7fb0ff, 0, 0.9, 2); light.position.y = -0.01; g.add(light);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: Textures.glowSprite(), color: new THREE.Color(0.35, 0.5, 1.2), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false }));
+  g.add(glow);
   g.visible = false;
-  // ratio: oxygen/acetylene (≈1 neutral). size: overall flow. cut: cutting jet on
-  g.userData.set = (ratio, size = 1, cut = false) => {
-    const r = THREE.MathUtils.clamp(ratio, 0.4, 1.8), s = THREE.MathUtils.clamp(size, 0.2, 1.6);
-    const ic = (r > 1.1 ? 0.0045 - (r - 1.1) * 0.004 : 0.0055) * s;   // oxidizing → short pointed cone
-    inner.scale.set(0.0012 * s, Math.max(0.0018, ic), 0.0012 * s);
-    const fl = r < 0.95 ? (0.95 - r) * 0.06 * s : 0;                   // carburizing → acetylene feather
-    feather.visible = fl > 0.001; feather.scale.set(0.0022 * s, ic + fl, 0.0022 * s);
-    const el = (0.045 - Math.max(0, r - 1) * 0.02) * s;
-    env.scale.set(0.006 * s, el, 0.006 * s); envTip.scale.set(0.009 * s, el * 1.15, 0.009 * s);
-    jet.visible = cut; jet.scale.set(0.0009, 0.05, 0.0009);
-    glow.position.y = -ic; glow.scale.setScalar(0.025 * s);
+  const P = { ic: 0.005, fl: 0, el: 0.05, ew: 0.006, s: 1, r: 1, yellow: 0, cut: false, ring: false };
+  // ratio = oxygen/acetylene (≈1 neutral, 0 = acetylene only). size grows with the acetylene flow. cut = cutting-O2 jet on.
+  g.userData.set = (ratio, size = 1, cut = false, ringOn = false) => {
+    const r = THREE.MathUtils.clamp(ratio, 0, 1.9), sz = THREE.MathUtils.clamp(size, 0.2, 1.7);
+    P.r = r; P.s = sz; P.cut = cut; P.ring = ringOn;
+    P.yellow = THREE.MathUtils.clamp((0.45 - r) / 0.3, 0, 1);                              // acetylene-only: big lazy yellow sooty flame
+    P.ic = (r > 1.08 ? 0.0075 - (r - 1.08) * 0.006 : 0.0078) * sz * (1 - P.yellow * 0.8);   // oxidizing → short pointed inner cone
+    P.fl = r < 0.98 ? (0.98 - r) * 0.11 * sz : 0;                                         // carburizing → acetylene feather
+    P.el = (0.055 - Math.max(0, r - 1) * 0.022) * sz * (1 + P.yellow * 1.6);
+    P.ew = (0.0062 + P.yellow * 0.008) * sz;
     g.userData.ratio = r;
+    apply(0);
   };
-  g.userData.flicker = t => { const f = 0.94 + Math.sin(t * 40) * 0.03 + Math.random() * 0.04; env.scale.x = env.scale.z = env.scale.x * 0.98 + 0.006 * f * 0.02 + env.scale.x * 0.0; envTip.material.opacity = 0.14 + Math.random() * 0.06; inner.material.opacity = 0.9 + Math.random() * 0.1; };
-  g.userData.set(1, 1, false);
+  function apply(n) {
+    const j = 1 + n * (0.06 + P.yellow * 0.14);
+    inner.visible = P.yellow < 0.9 && !P.ring; inner.scale.set(0.0016 * P.s, P.ic, 0.0016 * P.s);
+    feather.visible = P.fl > 0.0008 && P.yellow < 0.9; feather.scale.set(0.0021 * P.s, (P.ic + P.fl) * (1 + n * 0.04), 0.0021 * P.s);
+    env.visible = P.yellow < 0.95; env.scale.set(P.ew * (1 - P.yellow * 0.5), P.el * j, P.ew * (1 - P.yellow * 0.5)); env.material.opacity = 1 - P.yellow * 0.7;
+    yellow.visible = P.yellow > 0.02; yellow.scale.set(0.011 * P.s, 0.11 * P.s * j, 0.011 * P.s); yellow.material.opacity = P.yellow;
+    ring.visible = P.ring && P.yellow < 0.9; ringCones.forEach(c => c.scale.set(0.0007 * P.s, P.ic * 0.75, 0.0007 * P.s));
+    jet.visible = P.cut; jet.scale.set(0.0011, 0.06 * (1 + n * 0.03), 0.0011);
+    glow.position.y = -P.ic; glow.scale.setScalar((0.03 + P.yellow * 0.05) * P.s);
+    glow.material.color.setRGB(P.yellow > 0.5 ? 1.1 : 0.35, P.yellow > 0.5 ? 0.6 : 0.5, P.yellow > 0.5 ? 0.2 : 1.2);
+    light.color.setHex(P.yellow > 0.5 ? 0xffa040 : 0x8fb4ff); light.intensity = (1.6 + P.yellow * 2.2) * P.s * (0.9 + n * 0.2);
+    body.rotation.z = n * 0.03 * (1 + P.yellow * 3);
+  }
+  g.userData.flicker = t => apply(Math.sin(t * 31) * 0.5 + Math.sin(t * 57 + 1.3) * 0.35 + (Math.random() - 0.5) * 0.4);
   return g;
 }
-
 export function flameType(r) { return r < 0.92 ? 'carb' : r > 1.12 ? 'oxid' : 'neutral'; }
 export const FLAME_NAMES = { carb: 'لهب مكربن (زيادة أسيتيلين)', neutral: 'لهب متعادل', oxid: 'لهب مؤكسد (زيادة أكسجين)' };
 export { mesh, V3 };

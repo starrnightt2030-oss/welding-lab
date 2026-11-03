@@ -7,6 +7,14 @@ const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness
 function M(geo, mat, p, r, s) { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; if (p) m.position.copy(p); if (r) m.rotation.set(...r); if (s) m.scale.set(...s); return m; }
 const cap = (r, l) => new THREE.CapsuleGeometry(r, l, 6, 16);
 
+// leather apron: wide skirt, narrow bib with curved armholes, bent to wrap the body
+function apronGeo() {
+  const sh = new THREE.Shape(), H = 0.88;
+  sh.moveTo(-0.23, 0); sh.lineTo(0.23, 0); sh.lineTo(0.22, 0.5); sh.quadraticCurveTo(0.11, 0.56, 0.1, H); sh.lineTo(-0.1, H); sh.quadraticCurveTo(-0.11, 0.56, -0.22, 0.5); sh.lineTo(-0.23, 0);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.004, bevelSegments: 2, curveSegments: 16 });
+  const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); p.setZ(i, p.getZ(i) - x * x * 1.6 + (y < 0.5 ? 0.012 * (0.5 - y) : 0)); }
+  g.computeVertexNormals(); return g;
+}
 export function buildTrainee() {
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const skin = std(0xc28a5e, { roughness: 0.6 }), cover = std(0x2a63c4, { roughness: 0.8 }), coverD = std(0x1d4a9a, { roughness: 0.8 });
@@ -86,7 +94,8 @@ export function buildTrainee() {
   ]);
   ['L', 'R'].forEach(k => { const arm = body.userData['arm' + k]; const j = new THREE.Group(); j.add(M(cap(0.064, 0.26), leather, V(0, -0.17, 0)), M(cap(0.058, 0.2), leather, V(0, -0.42, 0.01))); j.visible = false; arm.add(j); (W.jacketArms = W.jacketArms || []).push(j); });
   add('apron', body, [
-    M(new THREE.BoxGeometry(0.36, 0.86, 0.012), std(0x6e4424, { roughness: 0.9 }), V(0, 0.95, 0.13)),
+    M(apronGeo(), std(0x6e4424, { roughness: 0.9, bumpScale: 0.5 }), V(0, 0.5, 0.118)),
+    ...[-1, 1].map(sx => M(new THREE.CylinderGeometry(0.008, 0.008, 0.36, 8), std(0x4a2c14), V(sx * 0.2, 1.0, 0.0), [Math.PI / 2, 0, 0])),   // waist ties
     M(new THREE.TorusGeometry(0.075, 0.008, 6, 20, Math.PI), std(0x6b4423), V(0, 1.47, 0.06), [0, 0, 0])
   ]);
   ['glovesL', 'glovesT'].forEach(k => {

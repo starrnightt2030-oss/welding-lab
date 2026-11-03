@@ -402,9 +402,9 @@ body[data-stage=weld] .weld-bottom{bottom:1.7rem}
 
 /* ---------- defects on the bead ---------- */
 #defmarks{position:absolute;inset:0;pointer-events:none;z-index:6}
-.defmark{position:absolute;left:0;top:0;pointer-events:auto;display:flex;align-items:center;gap:.35rem;transform-origin:0 0;margin:0;padding:.2rem .6rem .2rem .25rem;border-radius:2rem;border:2px solid var(--c);background:rgba(10,14,22,.86);color:#fff;font:600 .82rem "IBM Plex Sans Arabic",sans-serif;white-space:nowrap;cursor:pointer;translate:-50% -100%;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.defmark{position:absolute;left:0;top:0;pointer-events:auto;display:flex;align-items:center;gap:.35rem;transform-origin:0 0;margin:0;padding:.2rem .6rem .2rem .25rem;border-radius:2rem;border:2px solid var(--c);background:rgba(10,14,22,.86);color:#fff;font:600 .82rem "IBM Plex Sans Arabic",sans-serif;white-space:nowrap;cursor:pointer;translate:-50% 0;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 .defmark i{width:1.4rem;height:1.4rem;border-radius:50%;display:grid;place-items:center;background:var(--c);color:#0b0d12;font-style:normal;font-weight:700;font-size:.8rem}
-.defmark::after{content:"";position:absolute;left:50%;bottom:-9px;width:2px;height:8px;background:var(--c)}
+.defmark::after{content:"";position:absolute;left:50%;top:-9px;width:2px;height:8px;background:var(--c)}
 .defmark.all{border-style:dashed}
 #defcard{position:absolute;z-index:8;left:50%;bottom:1rem;transform:translateX(-50%);width:min(30rem,92%);padding:.9rem 1rem;border-radius:1rem;border-top:4px solid var(--c)}
 #defcard .dc-h{display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem}
@@ -483,3 +483,16 @@ body:not([data-stage=weld]) .sticks{display:none}
 .flame-state span{font-size:.85rem;color:var(--text2);line-height:1.6}
 .flame-state.neutral{border-color:var(--good)}.flame-state.carb{border-color:#ffb020}.flame-state.oxid{border-color:var(--red)}.flame-state.off{border-color:#3a4a6a}
 .torch-card .dial svg{width:5.8rem!important;height:5.8rem!important;stroke:none}
+
+/* ---------- movable control pads ---------- */
+.stick.h{width:calc(min(15rem,34vw) * var(--pad,1));height:calc(5rem * var(--pad,1))}
+.stick.xy{width:calc(min(13rem,30vw) * var(--pad,1));height:calc(min(13rem,42vh) * var(--pad,1))}
+.stick .knob{width:calc(3rem * var(--pad,1));height:calc(3rem * var(--pad,1));margin:0 0 calc(-1.5rem * var(--pad,1)) calc(-1.5rem * var(--pad,1))}
+.aux-btn.near-l{width:calc(6rem * var(--pad,1));height:calc(6rem * var(--pad,1))}
+body.pad-edit .stick,body.pad-edit #aux-btn{outline:3px dashed #ffd166;outline-offset:4px;cursor:move;animation:wob 1.2s ease-in-out infinite}
+@keyframes wob{50%{outline-color:#fff}}
+.pad-bar{position:absolute;z-index:9;top:4.2rem;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;padding:.6rem .8rem;border-radius:1rem;max-width:94vw}
+.pad-bar b{width:100%;font-size:.9rem}
+.pad-bar span{font-size:.8rem;color:var(--muted)}
+.pad-bar button{border:1px solid var(--line2);background:var(--surface2);color:var(--text);border-radius:.6rem;padding:.45rem .7rem;font:600 .82rem "IBM Plex Sans Arabic",sans-serif;cursor:pointer}
+.pad-bar button.on,.pad-bar button.primary{background:var(--accent);border-color:var(--accent);color:#fff}

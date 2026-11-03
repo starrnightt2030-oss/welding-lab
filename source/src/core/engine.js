@@ -14,10 +14,13 @@ export const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) /
 
 export function createEngine(viewport) {
   const isMobile = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820;
-  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.6 : 2));
+  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.autoUpdate = false;   // shadows are re-rendered only when something in the scene moved
+  // ---- resolution budget: big 4K touch screens would otherwise render ~16 M pixels per frame
+  const quality = { scale: 1, budget: isMobile ? 1.5e6 : 2.4e6, maxPR: isMobile ? 1.6 : 1.5 };
+  const pixelRatio = () => { const w = viewport.clientWidth || innerWidth, h = viewport.clientHeight || innerHeight; return Math.max(0.5, Math.min(window.devicePixelRatio || 1, quality.maxPR, Math.sqrt(quality.budget / (w * h))) * quality.scale); };
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   viewport.prepend(renderer.domElement);
@@ -40,7 +43,7 @@ export function createEngine(viewport) {
   controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
   controls.target.set(0.1, 0.55, 0);
 
-  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: isMobile ? 2 : 4 });
+  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 2 });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.5, 2.2);
@@ -48,7 +51,7 @@ export function createEngine(viewport) {
   // selection = clean glowing outline around the part's silhouette (no tint over the part itself)
   const outline = new OutlinePass(new THREE.Vector2(256, 256), scene, camera);
   outline.visibleEdgeColor.set(0x3d9bff); outline.hiddenEdgeColor.set(0x16407a);
-  outline.edgeStrength = 9; outline.edgeGlow = 0.35; outline.edgeThickness = 2.2; outline.pulsePeriod = 2.4; outline.enabled = false;
+  outline.edgeStrength = 9; outline.edgeGlow = 0.35; outline.edgeThickness = 2.2; outline.pulsePeriod = 0; outline.enabled = false;
   composer.addPass(outline);
   composer.addPass(new OutputPass());
 
@@ -58,7 +61,7 @@ export function createEngine(viewport) {
   const bounce = new THREE.DirectionalLight(0xffe2c4, 0.35); bounce.position.set(1.5, 0.3, 1.2); scene.add(bounce);
   const key = new THREE.SpotLight(0xfff0dc, 42, 9, 0.8, 0.65, 2);
   key.position.set(0.9, 2.8, 1.7); key.target.position.set(0.05, 0.5, 0);
-  key.castShadow = true; key.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
+  key.castShadow = true; key.shadow.mapSize.set(isMobile ? 1024 : 1536, isMobile ? 1024 : 1536);
   key.shadow.bias = -0.0003; key.shadow.normalBias = 0.012; key.shadow.radius = 3; key.shadow.camera.near = 0.8; key.shadow.camera.far = 6;
   scene.add(key, key.target);
   const over = new THREE.SpotLight(0xffe7c4, 6, 4, 0.55, 0.8, 2);
@@ -79,7 +82,7 @@ export function createEngine(viewport) {
   let highlighted = [];
   const setHighlight = objs => {
     highlighted = (objs || []).filter(Boolean);
-    outline.selectedObjects = highlighted; outline.enabled = highlighted.length > 0;
+    outline.selectedObjects = highlighted; outline.enabled = highlighted.length > 0; poke(200);
   };
 
   // ---- picking
@@ -111,31 +114,51 @@ export function createEngine(viewport) {
   const resize = () => {
     const w = viewport.clientWidth, h = viewport.clientHeight;
     if (!w || !h) return;
+    renderer.setPixelRatio(pixelRatio());
     renderer.setSize(w, h, false);
     renderer.domElement.style.width = w + 'px'; renderer.domElement.style.height = h + 'px';
     composer.setSize(w, h);
     bloom.resolution.set(w / 2, h / 2);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    E.onResize && E.onResize();
+    E.onResize && E.onResize(); poke(400);
   };
+  // ---- render on demand: when nothing moves we keep the last frame instead of redrawing the whole scene
+  let dirtyUntil = 0, sceneDirty = true, lastCam = new THREE.Matrix4(), frames = 0, acc = 0, goodFor = 0;
+  function poke(ms = 600, moved = true) { dirtyUntil = Math.max(dirtyUntil, performance.now() + ms); if (moved) sceneDirty = true; }
   new ResizeObserver(resize).observe(viewport);
   const loop = () => {
     const raw = clock.getDelta(), dt = Math.min(raw, 0.05);
-    if (!lowered) { if (raw > 0.045) slow++; else slow = Math.max(0, slow - 1); if (slow > 90) { lowered = true; renderer.setPixelRatio(1); key.shadow.mapSize.set(1024, 1024); resize(); } }
+    void slow; void lowered;
     for (let i = tweens.length - 1; i >= 0; i--) {
       const t = tweens[i]; t.t += Math.min(raw, 0.1); const k = Math.min(1, t.t / t.dur); t.fn(k);
       if (k >= 1) { tweens.splice(i, 1); t.done && t.done(); }
     }
+    if (tweens.length) poke(50);
     hooks.forEach(f => f(dt, raw));
     controls.update();
-    composer.render();
-    if (E.overlay && E.overlay.children.length > 3) { renderer.autoClear = false; if (E.overlayBg) renderer.render(E.overlayBg, camera); renderer.clearDepth(); renderer.render(E.overlay, camera); renderer.autoClear = true; }
+    camera.updateMatrixWorld();
+    const camMoved = !lastCam.equals(camera.matrixWorld); if (camMoved) lastCam.copy(camera.matrixWorld);
+    const now = performance.now();
+    if (E.always || camMoved || now < dirtyUntil) {
+      if (sceneDirty || E.always) { renderer.shadowMap.needsUpdate = true; sceneDirty = false; }
+      bloom.enabled = !!E.glow;
+      composer.render();
+      if (E.overlay && E.overlay.children.length > 3) { renderer.autoClear = false; if (E.overlayBg) renderer.render(E.overlayBg, camera); renderer.clearDepth(); renderer.render(E.overlay, camera); renderer.autoClear = true; }
+      // dynamic resolution: keep ≥ ~45 fps by lowering the render scale, raise it again when there is headroom
+      frames++; acc += raw;
+      if (frames >= 30) {
+        const ms = acc / frames * 1000; frames = 0; acc = 0;
+        if (ms > 23 && quality.scale > 0.55) { quality.scale = Math.max(0.55, quality.scale * 0.85); goodFor = 0; resize(); }
+        else if (ms < 14 && quality.scale < 1) { if (++goodFor >= 4) { quality.scale = Math.min(1, quality.scale / 0.88); goodFor = 0; resize(); } }
+        else goodFor = 0;
+      }
+    } else { frames = 0; acc = 0; }
     requestAnimationFrame(loop);
   };
 
   const E = {
     THREE, renderer, scene, camera, controls, composer, bloom, key, isMobile, tweens,
-    tween, flyTo, setHighlight, pick, setRay, ray, resize,
+    tween, flyTo, setHighlight, pick, setRay, ray, resize, poke, quality, always: false, glow: false,
     onFrame: f => hooks.add(f),
     start: () => { resize(); loop(); },
     tweening: () => tweens.some(t => t.cam)

@@ -89,6 +89,8 @@ export function startApp(STATIONS) {
     const s = S();
     if (shared.plates) shared.plates.visible = true;
     s.enter && s.enter(ctx);
+    // establishing shot: start wide so the student sees this corner of the workshop, then the camera flies in
+    E.camera.position.set(2.4, 2.0, 3.3); E.controls.target.set(0.1, 0.95, -0.4); E.controls.update();
     goStage(s.stages[0][0]);
   }
   function goHub() {
@@ -137,6 +139,7 @@ export function startApp(STATIONS) {
       state.prep = { clean: proc.kind === 'cut' ? 1 : 0, done: proc.kind === 'cut' };
       if (!state.prep.done) clean.start('pre');
     }
+    E.poke(st === 'inspect' ? 9000 : 2500);
     if (st === 'inspect') {
       if (!state.report) state.report = sim.proc ? sim.evaluate() : null; s.inspectEnter && s.inspectEnter(ctx);
       state.showDef = false;
@@ -151,7 +154,7 @@ export function startApp(STATIONS) {
     E.resize();
     const cam = st === 'weld' ? (clean.active ? cleanCamera() : weldCamera()) : st === 'inspect' ? (clean.active ? cleanCamera() : inspectCamera()) : s.cams[st]();
     renderClean(); if (state.showDef) setTimeout(() => state.stage === 'inspect' && showDefects(true), 900);
-    E.flyTo(cam.pos, cam.target, prev === st ? 0.01 : 1.2);
+    E.flyTo(cam.pos, cam.target, prev === st ? 0.01 : prev === 'hub' || !prev ? 2.2 : 1.2);
     const intro = INTRO[s.id] && INTRO[s.id][st];
     if (st === 'assemble') voice.say((intro ? intro + ' ' : '') + stepSpeech());
     else if (st === 'inspect' && state.report && !state.report.empty) voice.say('درجتك ' + state.report.total + ' من مئة. التقدير ' + state.report.grade + '. ' + (state.report.defects.length ? 'العيوب التي ظهرت: ' + state.report.defects.map(d => d.name).join('، ') + '.' : 'لا توجد عيوب واضحة، عمل نظيف.'));
@@ -191,7 +194,7 @@ export function startApp(STATIONS) {
   function onClean(e) {
     if (e.prog != null && !e.done) { const b = document.querySelector('#clean-ui .bar i'); if (b) b.style.width = Math.round(e.prog * 100) + '%'; return; }
     if (e.done === 'pre') {
-      state.prep = { clean: clean.cleanFrac(), done: true };
+      state.prep = { clean: clean.cleanFrac(), done: true }; sim.dirty = Math.max(0, 0.85 - state.prep.clean);
       showToast(state.prep.clean > 0.8 ? 'good' : 'bad', state.prep.clean > 0.8 ? 'ممتاز، أصبح سطح الوصلة نظيفًا. الآن ابدأ اللحام.' : 'لم يُنظَّف السطح جيدًا؛ قد تظهر مسامية في الخط.');
       const c = weldCamera(); E.flyTo(c.pos, c.target, 0.8); E.controls.enabled = false;
     } else if (e.done === 'chip') {
@@ -366,6 +369,8 @@ export function startApp(STATIONS) {
   // ---------------------------------------------------------------- picking / pointer
   let downAt = null;
   const cv = E.renderer.domElement;
+  ['pointerdown', 'pointermove', 'wheel', 'keydown'].forEach(t => window.addEventListener(t, () => E.poke(1200, t !== 'pointermove'), { passive: true }));
+  ['click', 'input', 'change'].forEach(t => document.addEventListener(t, () => E.poke(900), true));
   cv.addEventListener('pointerdown', ev => {
     audio.ensure(); tryLandscape();
     if (hold) { holdPointer(ev, 'down'); return; }
@@ -483,7 +488,7 @@ export function startApp(STATIONS) {
   function bindSticks() {
     const l = $('#stick-l'), r = $('#stick-r'); if (!r) return;
     const bind = (el, key) => {
-      const set = ev => { const b = el.getBoundingClientRect(); sticks[key] = { x: THREE.MathUtils.clamp((ev.clientX - b.left) / b.width, 0, 1), y: THREE.MathUtils.clamp(1 - (ev.clientY - b.top) / b.height, 0, 1), id: ev.pointerId }; drawStick(el, sticks[key]); };
+      const set = ev => { if (state.padEdit) return; const b = el.getBoundingClientRect(); sticks[key] = { x: THREE.MathUtils.clamp((ev.clientX - b.left) / b.width, 0, 1), y: THREE.MathUtils.clamp(1 - (ev.clientY - b.top) / b.height, 0, 1), id: ev.pointerId }; drawStick(el, sticks[key]); };
       el.addEventListener('pointerdown', ev => { ev.preventDefault(); audio.ensure(); try { el.setPointerCapture(ev.pointerId); } catch (e) {} set(ev); if (key === 'R') { const w = state.weld; w.pid = ev.pointerId; } });
       el.addEventListener('pointermove', ev => { if (sticks[key] && sticks[key].id === ev.pointerId) set(ev); });
       const end = ev => { if (sticks[key] && sticks[key].id === ev.pointerId) { sticks[key] = null; drawStick(el, null); if (key === 'R') { state.weld.pressing = false; } } };
@@ -491,6 +496,28 @@ export function startApp(STATIONS) {
     };
     if (l) bind(l, 'L'); bind(r, 'R');
   }
+  // ---- movable / resizable controls: the trainer can drag the pads to where his hands are on the big touch screen
+  const PADS = ['stick-l', 'stick-r', 'aux-btn'];
+  function applyPads() {
+    document.documentElement.style.setProperty('--pad', store.get('padScale', 1));
+    PADS.forEach(id => { const el = document.getElementById(id), p = store.get('pad.' + id, null); if (!el) return;
+      if (p) { el.style.position = 'fixed'; el.style.left = (p.x * innerWidth) + 'px'; el.style.top = (p.y * innerHeight) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.margin = '0'; }
+      else { el.style.position = ''; el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.margin = ''; } });
+  }
+  let padDrag = null;
+  window.addEventListener('pointerdown', ev => {
+    if (!state.padEdit) return; const el = ev.target.closest('#stick-l,#stick-r,#aux-btn'); if (!el) return;
+    ev.preventDefault(); ev.stopPropagation(); const r = el.getBoundingClientRect(); padDrag = { el, dx: ev.clientX - r.left, dy: ev.clientY - r.top, id: ev.pointerId };
+  }, true);
+  window.addEventListener('pointermove', ev => {
+    if (!padDrag || ev.pointerId !== padDrag.id) return; ev.stopPropagation();
+    const el = padDrag.el, r = el.getBoundingClientRect(), x = THREE.MathUtils.clamp(ev.clientX - padDrag.dx, 0, innerWidth - r.width), y = THREE.MathUtils.clamp(ev.clientY - padDrag.dy, 0, innerHeight - r.height);
+    el.style.position = 'fixed'; el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.margin = '0';
+  }, true);
+  window.addEventListener('pointerup', ev => {
+    if (!padDrag || ev.pointerId !== padDrag.id) return; const el = padDrag.el, r = el.getBoundingClientRect();
+    store.set('pad.' + el.id, { x: r.left / innerWidth, y: r.top / innerHeight }); padDrag = null;
+  }, true);
   function drawStick(el, v) { const k = el.querySelector('.knob'); if (!k) return; el.classList.toggle('on', !!v); if (el.id === 'stick-l') k.style.left = (v ? v.x * 100 : 50) + '%'; else { k.style.left = (v ? v.x * 100 : 50) + '%'; k.style.bottom = (v ? v.y * 100 : 50) + '%'; } }
   function stickRange() { const p = sim.proc; return { max: p.breakAbove != null ? p.breakAbove + 1 : p.ideal.dist[1] * 2.2 }; }
   function sticksFrame(dt) {
@@ -542,16 +569,16 @@ export function startApp(STATIONS) {
     defectGroup = new THREE.Group();
     const R = state.report, h = Math.max(0.0015, (R.height || 2) / 1000);
     R.defects.forEach((d, i) => (d.spots || []).forEach((sp, j) => {
-      const len = Math.max(0.006, sp.x1 - sp.x0), col = DCOL[i % DCOL.length];
-      const band = new THREE.Mesh(new THREE.BoxGeometry(len, h * 1.4, 0.014), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.32, depthWrite: false, toneMapped: false }));
-      band.position.set((sp.x0 + sp.x1) / 2, JOINT.y + h * 0.5, JOINT.z); defectGroup.add(band);
-      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(band.geometry), new THREE.LineBasicMaterial({ color: col, toneMapped: false }));
-      edge.position.copy(band.position); defectGroup.add(edge);
+      // a coloured bracket BESIDE the bead (never over it) so the defect itself stays visible
+      const len = Math.max(0.006, sp.x1 - sp.x0), col = DCOL[i % DCOL.length], zz = JOINT.z + 0.011 + (i % 3) * 0.0035;
+      const band = new THREE.Mesh(new THREE.BoxGeometry(len, 0.0006, 0.0022), new THREE.MeshBasicMaterial({ color: col, toneMapped: false, transparent: sp.all, opacity: sp.all ? 0.55 : 1 }));
+      band.position.set((sp.x0 + sp.x1) / 2, JOINT.y + 0.0003, zz); defectGroup.add(band);
+      [sp.x0, sp.x0 + len].forEach(ex => { const t = new THREE.Mesh(new THREE.BoxGeometry(0.0012, 0.0006, 0.007), band.material); t.position.set(ex, JOINT.y + 0.0003, zz - 0.0025); defectGroup.add(t); });
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'defmark' + (sp.all ? ' all' : ''); b.dataset.act = 'def-focus'; b.dataset.i = i; b.dataset.j = j;
       b.style.setProperty('--c', '#' + col.toString(16).padStart(6, '0'));
       b.innerHTML = `<i>${AR(i + 1)}</i><span>${d.name}${sp.all ? ' — على طول الخط' : ''}</span>`;
-      b.userData = { x: (sp.x0 + sp.x1) / 2, y: JOINT.y + h * 1.6 }; b._pos = b.userData;
+      b._pos = { x: sp.all ? JOINT.x0 + 0.015 + i * 0.022 : (sp.x0 + sp.x1) / 2, y: JOINT.y + h * 1.6, z: JOINT.z + 0.011 + (i % 3) * 0.0035 };
       defLayer.appendChild(b);
     }));
     E.scene.add(defectGroup);
@@ -561,10 +588,10 @@ export function startApp(STATIONS) {
     if (!defLayer.children.length) return;
     const w = viewport.clientWidth, hh = viewport.clientHeight;
     [...defLayer.children].forEach((b, k) => {
-      _dp.set(b._pos.x, b._pos.y, JOINT.z).project(E.camera);
+      _dp.set(b._pos.x, b._pos.y, b._pos.z).project(E.camera);
       const vis = _dp.z < 1 && Math.abs(_dp.x) < 1.05 && Math.abs(_dp.y) < 1.05;
       b.style.display = vis ? '' : 'none';
-      b.style.transform = `translate(${(_dp.x * 0.5 + 0.5) * w}px, ${(-_dp.y * 0.5 + 0.5) * hh - 18 - (k % 2) * 26}px)`;
+      b.style.transform = `translate(${(_dp.x * 0.5 + 0.5) * w}px, ${(-_dp.y * 0.5 + 0.5) * hh + 34 + (k % 3) * 30}px)`;
     });
   }
   function focusDefect(i, j) {
@@ -718,10 +745,12 @@ export function startApp(STATIONS) {
       <div class="weld-tools">
         ${proc.lens !== false ? `<button type="button" class="btn ${state.lens ? 'on-green' : ''}" data-act="lens">${ICON.lens}<span>${proc.lensName || 'الماسك'}</span></button>` : ''}
         <button type="button" class="btn" data-act="control">${ICON.hand}<span>${CTRL_NAME[state.control]}</span></button>
+        ${state.control === 'sticks' ? `<button type="button" class="btn ${state.padEdit ? 'on' : ''}" data-act="pad-edit" aria-label="ترتيب أدوات التحكم">${ICON.target}<span>${state.padEdit ? 'تم' : 'ترتيب التحكم'}</span></button>` : ''}
         <div class="lvl" role="group" aria-label="مستوى الصعوبة">${Object.entries(LEVELS).map(([k, v]) => `<button type="button" class="${state.level === k ? 'on' : ''}" data-act="level:${k}">${v}</button>`).join('')}</div>
         ${proc.consumable ? `<button type="button" class="btn" data-act="new-consumable">${ICON.reset}<span>${proc.consumable.newName}</span></button>` : ''}
         <button type="button" class="btn primary" data-act="finish">افحص ${ICON.next}</button>
       </div>
+      ${state.padEdit ? `<div class="pad-bar glass"><b>اسحب لوحات التحكم إلى المكان المريح ليديك</b><span>الحجم</span>${[0.85, 1, 1.25, 1.5].map(z => `<button type="button" class="${+store.get('padScale', 1) === z ? 'on' : ''}" data-act="pad-size:${z}">${z === 0.85 ? 'صغير' : z === 1 ? 'عادي' : z === 1.25 ? 'كبير' : 'كبير جدًا'}</button>`).join('')}<button type="button" data-act="pad-reset">الأماكن الأصلية</button><button type="button" class="primary" data-act="pad-edit">تم</button></div>` : ''}
       ${state.control === 'sticks' ? `<div class="sticks">
         ${state.level !== 'beg' ? `<div id="stick-l" class="stick h"><span class="cap">الحركة على الخط</span><i class="rail"></i><b class="knob"></b><small class="lr"><span>رجوع</span><span>تقدّم</span></small></div>` : `<div class="stick-note">المستوى المبتدئ: الأداة تتحرك وحدها بالسرعة الصحيحة.<br>تحكّم أنت في ${proc.distName}.</div>`}
         <div id="stick-r" class="stick xy"><span class="cap">${proc.distName}${proc.angle !== false && state.level === 'adv' ? ' + الزاوية' : ''}</span><i class="zone" style="bottom:${(proc.ideal.dist[0] / stickRange().max * 100).toFixed(1)}%;height:${((proc.ideal.dist[1] - proc.ideal.dist[0]) / stickRange().max * 100).toFixed(1)}%"></i><b class="knob"></b><small>المس لتبدأ • أعلى = أبعد</small></div>
@@ -740,7 +769,7 @@ export function startApp(STATIONS) {
       const off = () => { state.weld.aux = false; state.weld.auxHeld = false; ab.classList.remove('on'); };
       ab.addEventListener('pointerdown', on); ab.addEventListener('pointerup', off); ab.addEventListener('pointercancel', off); ab.addEventListener('pointerleave', off);
     }
-    bindSticks(); document.body.classList.toggle('sticks-mode', state.control === 'sticks');
+    bindSticks(); document.body.classList.toggle('sticks-mode', state.control === 'sticks'); applyPads(); document.body.classList.toggle('pad-edit', !!state.padEdit);
   }
   function gauge(id, val, txt, min, max, lo, hi) {
     const g = document.getElementById('g-' + id); if (!g) return;
@@ -811,6 +840,9 @@ export function startApp(STATIONS) {
     else if (a === 'asm-auto') { if (!state.asm.busy) s.asmAuto(ctx); }
     else if (a === 'lens') { state.lens = !state.lens; renderHUD(); if (!state.lens) showToast('bad', 'تحذير: في الورشة يُمنع النظر إلى القوس أو اللهب دون قناع أو نظارة مناسبة. هذا للعرض فقط.'); }
     else if (a === 'control') { const o = ['sticks', 'rel', 'direct']; state.control = o[(o.indexOf(state.control) + 1) % 3]; store.set('control', state.control); setAssist(state.assist); renderHUD(); showToast('info', CTRL_TIP[state.control]); }
+    else if (a === 'pad-edit') { state.padEdit = !state.padEdit; renderHUD(); }
+    else if (a && a.startsWith('pad-size:')) { store.set('padScale', +a.slice(9)); renderHUD(); }
+    else if (a === 'pad-reset') { PADS.forEach(id => store.set('pad.' + id, null)); store.set('padScale', 1); renderHUD(); }
     else if (a && a.startsWith('level:')) { state.level = a.slice(6); store.set('level', state.level); state.assist = state.level !== 'adv'; setAssist(state.assist); renderHUD(); showToast('info', LEVEL_TIP[state.level]); }
     else if (a === 'assist') { state.assist = !state.assist; setAssist(state.assist); renderHUD(); }
     else if (a === 'new-consumable') { sim.consumable = sim.proc.consumable.len; showToast('info', sim.proc.consumable.newMsg); }
@@ -855,6 +887,8 @@ export function startApp(STATIONS) {
   // ---------------------------------------------------------------- loop & boot
   E.onFrame(dt => {
     holdFrame(dt); clean && clean.frame(dt);
+    { const st = S(); E.always = state.stage === 'weld' || !!hold || !!(clean && clean.active) || state.stage === 'wear' || !!(st && st.animating && st.animating(ctx)) || explodeK > 0 && explodeK < 1;
+      E.glow = state.stage === 'weld' || state.stage === 'inspect' || !!(st && st.animating && st.animating(ctx)); }
     const s = S();
     if (state.stage === 'weld') weldFrame(dt);
     else if (sim) { sim.time += dt; if (state.stage === 'inspect') sim.updateSlag(dt); sim.updateRipples(); sim.updateSparks(dt); sim.updateSmoke(dt); }
