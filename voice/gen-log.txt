@@ -1,3 +1,3 @@
-edge-tts 7.3.1 ar-EG-ShakirNeural -6% -2Hz lines 2106
+edge-tts 7.3.1 ar-EG-ShakirNeural -6% -2Hz lines 2117
 probe ok 17280
-ok 2106 failed 0
+ok 2117 failed 0
