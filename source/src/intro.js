@@ -1,6 +1,7 @@
 // Animated welcome screen: sparks from the cartoon welder's arc, then "enter" → sting + spoken welcome.
 export const WELCOME = 'مرحباً بكم في معمل محاكاة عمليات اللحام الافتراضي.';
 export function runIntro() {
+  try { const v = document.querySelector('meta[name=build]'); const el = document.getElementById('app-ver'); if (v && el) el.textContent = 'إصدار ' + v.content + (location.protocol === 'file:' ? ' — نسخة بدون إنترنت' : ''); } catch (e) {}
   const root = document.getElementById('loading'), g = document.getElementById('sparks');
   if (!root || !g) return { ready() {}, };
   const NS = 'http://www.w3.org/2000/svg', pool = [];

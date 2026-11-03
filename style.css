@@ -509,3 +509,4 @@ body.pad-edit .stick,body.pad-edit #aux-btn{outline:3px dashed #ffd166;outline-o
 .work-ctl .wk{position:relative;flex:1}.work-ctl input{width:100%}
 .work-ctl .ideal{position:absolute;top:-.35rem;width:3px;height:1.4rem;margin-left:-1.5px;background:var(--good);border-radius:2px;pointer-events:none}
 body.sticks-mode .work-ctl{bottom:auto;top:4.6rem}
+.intro-ver{display:block;margin-top:.8rem;font-size:.75rem;color:#8fa3c4;animation:up .7s 3s both}

@@ -1033,7 +1033,12 @@ export function startApp(STATIONS) {
     }
   };
 
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    // a newer build takes over → reload once so the student always sees the latest lab
+    const hadCtrl = !!navigator.serviceWorker.controller; let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadCtrl && !reloaded && !booted) { reloaded = true; location.reload(); } else if (hadCtrl && !reloaded) { reloaded = true; showToast('info', 'وصل تحديث جديد للمعمل. أعد فتح التطبيق لرؤيته.', true); } });
+    navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).then(r => r.update && r.update()).catch(() => {});
+  }
   // in-app install button (Chrome / Edge / Android)
   let deferredInstall = null;
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; const b = $('#install-btn'); if (b) b.hidden = false; });

@@ -54,7 +54,7 @@ export class Voice {
     this.fileMode = location.protocol === 'file:';
     this.ready = this.fileMode
       ? new Promise(res => { const sc = document.createElement('script'); sc.src = base + 'index.js'; sc.onload = () => { this.ids = new Set((window.VOICE_INDEX && window.VOICE_INDEX.ids) || []); res(); }; sc.onerror = () => { this.ids = new Set(); res(); }; document.head.appendChild(sc); })
-      : fetch(base + 'index.json').then(r => r.ok ? r.json() : null).then(j => { this.ids = new Set(j && j.ids || []); }).catch(() => { this.ids = new Set(); });
+      : fetch(base + 'index.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { this.ids = new Set(j && j.ids || []); }).catch(() => { this.ids = new Set(); });
     this.tts = 'speechSynthesis' in window; this.ttsVoice = null;
     if (this.tts) { const pick = () => { const vs = speechSynthesis.getVoices().filter(v => /^ar/i.test(v.lang)); this.ttsVoice = vs.find(v => /EG/i.test(v.lang)) || vs[0] || null; }; pick(); speechSynthesis.onvoiceschanged = pick; }
   }
