@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { JOINT } from '../models.js';
 
-export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
+export function createCleaning({ E, audio, sim, hammer, brush, onChange, workFrame }) {
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit = new THREE.Vector3();
   let mode = null;          // { kind: 'pre' | 'chip' | 'post', prog }
   let saved = null, swing = 0, scrub = 0, pressed = false, lastX = null, overTool = false;
@@ -12,9 +12,30 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
   const GW = 64, GH = 16, cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
   const dirt = new Float32Array(GW * GH);
-  const rust = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
-  rust.rotation.x = -Math.PI / 2; rust.visible = false; rust.renderOrder = 2; E.scene.add(rust);
+  // the layer follows the real surfaces of each joint (taper of a thicker plate, the step of a lap, the web of a tee)
+  // and lives in the work frame, so it stays on the piece when it is mounted in a welding position
+  const rustMat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
+  const rust = new THREE.Group(); rust.visible = false; rust.renderOrder = 2; (workFrame || E.scene).add(rust);
   const RX0 = () => JOINT.x0 - 0.012, RX1 = () => JOINT.x1 + 0.012, RZ = 0.032;
+  const vOf = z => (z - (JOINT.z - RZ)) / (2 * RZ);
+  function strip(pts) {   // pts: rows of [y, z, v] across the joint; columns span x
+    const pos = [], uv = [], idx = [], x0 = RX0(), x1 = RX1();
+    pts.forEach(([y, z, v]) => { pos.push(x0, y, z, x1, y, z); uv.push(0, v, 1, v); });
+    for (let i = 0; i < pts.length - 1; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, rustMat); m.renderOrder = 2; return m;
+  }
+  function layoutRust() {
+    rust.children.slice().forEach(m => { rust.remove(m); m.geometry.dispose(); });
+    const Z = JOINT.z, N = 64, top = [], lift = 0.0004;
+    for (let i = 0; i <= N; i++) { const z = Z - RZ + (2 * RZ) * i / N; top.push([(JOINT.surf ? JOINT.surf(z) : JOINT.y) + lift, z, vOf(z)]); }
+    rust.add(strip(top));
+    if (JOINT.kind === 'tee') {   // mill scale on the face of the web too, cleaned together with the corner
+      const w = [];
+      for (let i = 0; i <= 8; i++) { const h = 0.032 * i / 8; w.push([JOINT.y + h, Z + lift, vOf(Z + 0.008) + (i / 8) * (vOf(Z + 0.02) - vOf(Z + 0.008))]); }
+      rust.add(strip(w));
+    }
+  }
   function paintRust() {
     const c = cv.getContext('2d'); c.clearRect(0, 0, 512, 128);
     for (let i = 0; i < 900; i++) {
@@ -26,8 +47,11 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
     }
     // oily patch
     c.fillStyle = 'rgba(30,25,15,.35)'; c.beginPath(); c.ellipse(330, 70, 40, 18, 0.3, 0, 7); c.fill();
-    dirt.fill(1); tex.needsUpdate = true;
+    dirt.fill(1); tex.needsUpdate = true; layoutRust(); painted = true;
   }
+  let painted = false;
+  // which rows of the dirt grid lie on surfaces the brush can reach (behind a tee's web is out of reach)
+  const rowOK = y => { const v = 1 - y / (GH - 1); return JOINT.kind === 'tee' ? v > 0.56 && v < 0.98 : v > 0.12 && v < 0.9; };
   function scrubAt(x, z) {
     const u = (x - RX0()) / (RX1() - RX0()), v = (z - (JOINT.z - RZ)) / (2 * RZ);
     if (u < -0.05 || u > 1.05 || v < -0.2 || v > 1.2) return false;
@@ -39,7 +63,7 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
     for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { const X = gx + i, Y = gy + j; if (X < 0 || Y < 0 || X >= GW || Y >= GH) continue; const k = dirt[Y * GW + X]; dirt[Y * GW + X] = Math.max(0, k - 0.22 * (1 - Math.hypot(i, j) / 4.5)); }
     return true;
   }
-  const cleanFrac = () => { let s = 0, n = 0; for (let y = 3; y < GH - 3; y++) for (let x = 0; x < GW; x++) { s += dirt[y * GW + x]; n++; } return 1 - s / n; };
+  const cleanFrac = () => { let s = 0, n = 0; for (let y = 0; y < GH; y++) { if (!rowOK(y)) continue; for (let x = 2; x < GW - 2; x++) { s += dirt[y * GW + x]; n++; } } return n ? 1 - s / n : 1; };
 
   // ---- flying slag chips
   const chipGeo = new THREE.DodecahedronGeometry(0.0022, 0), chipMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.3, metalness: 0.1 });
@@ -58,13 +82,13 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
   }
   function start(kind) {
     mode = { kind, prog: 0 };
-    if (kind === 'pre') { paintRust(); rust.visible = true; const w = RX1() - RX0(); rust.scale.set(w, 2 * RZ, 1); rust.position.set((RX0() + RX1()) / 2, JOINT.y + 0.0004, JOINT.z); }
+    if (kind === 'pre') { if (!painted) paintRust(); rust.visible = true; }
     pose(null, true);
     const tool = kind === 'chip' ? hammer : brush;
     tool.position.set(0.3, JOINT.y + 0.03, JOINT.z + 0.03); tool.rotation.set(0, kind === 'chip' ? Math.PI * 0.8 : -0.4, kind === 'chip' ? 0 : 0.32); tool.scale.setScalar(kind === 'chip' ? 0.7 : 0.45);
     E.controls.enabled = false; update();
   }
-  function stop() { if (!mode) return; mode = null; rust.visible = false; pose(null, false); E.controls.enabled = true; pressed = false; }
+  function stop() { if (!mode) return; mode = null; pose(null, false); E.controls.enabled = true; pressed = false; }
   function finish() { const k = mode.kind; stop(); onChange && onChange({ done: k }); }
   function skip() { if (mode) finish(); }
   function update() { onChange && onChange({ prog: mode ? mode.prog : 1, kind: mode && mode.kind }); }
@@ -77,7 +101,7 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
     if (phase === 'up') { pressed = false; lastX = null; return true; }
     if (!p) return true;
     const tool = mode.kind === 'chip' ? hammer : brush;
-    const x = THREE.MathUtils.clamp(p.x, JOINT.x0 - 0.02, JOINT.x1 + 0.02), z = THREE.MathUtils.clamp(p.z, (JOINT.kind === 'tee' || JOINT.kind === 'lap') ? JOINT.z + 0.012 : JOINT.z - 0.04, JOINT.z + 0.04);
+    const x = THREE.MathUtils.clamp(p.x, JOINT.x0 - 0.02, JOINT.x1 + 0.02), z = THREE.MathUtils.clamp(p.z, JOINT.kind === 'tee' ? JOINT.z + 0.012 : JOINT.z - 0.03, JOINT.z + 0.04);
     if (mode.kind === 'chip') {
       tool.position.set(x, JOINT.y + 0.1 + (pressed ? 0 : 0.02), JOINT.z + 0.004);
       if (phase === 'down') { swing = 1; strike(x); }
@@ -114,5 +138,8 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
       void base;
     } else if (pressed) { brush.rotation.z = 0.32 + Math.sin(performance.now() / 45) * 0.04; }
   }
-  return { start, stop, skip, pointer, frame, get active() { return !!mode; }, get kind() { return mode && mode.kind; }, get prog() { return mode ? mode.prog : 0; }, cleanFrac };
+  // fresh rusty plates (new exercise) / show what is left on the piece / hide
+  function freshRust() { paintRust(); }
+  function showRust(on) { if (on && !painted) paintRust(); rust.visible = !!on; }
+  return { start, stop, skip, pointer, frame, freshRust, showRust, get active() { return !!mode; }, get kind() { return mode && mode.kind; }, get prog() { return mode ? mode.prog : 0; }, cleanFrac };
 }

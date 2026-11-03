@@ -68,7 +68,7 @@ export function startApp(STATIONS) {
     if (!E.camera.parent) E.scene.add(E.camera);
     camFill = new THREE.DirectionalLight(0xfff1dc, 0); camFill.position.set(0.15, 0.25, 0.2); camFill.target.position.set(0, -0.05, -1);
     E.camera.add(camFill, camFill.target);
-    clean = createCleaning({ E, audio, sim, hammer, brush, onChange: onClean });
+    clean = createCleaning({ E, audio, sim, hammer, brush, onChange: onClean, workFrame: fitup.posFrame });
     for (const S of STATIONS) {
       if (!S.ready) continue;
       S.root = new THREE.Group(); S.root.visible = false; E.scene.add(S.root);
@@ -82,8 +82,9 @@ export function startApp(STATIONS) {
     const key = JSON.stringify(opts);
     if (key === platesOpts) return;
     platesOpts = key;
-    if (plates) { E.scene.remove(plates); plates.traverse(o => o.geometry && o.geometry.dispose()); }
+    if (plates) { plates.parent && plates.parent.remove(plates); plates.traverse(o => o.geometry && o.geometry.dispose()); }
     plates = buildPlates(M, opts); plates.userData.pick = 'plates'; (fitup ? fitup.posFrame : E.scene).add(plates);
+    if (clean) clean.freshRust();   // a new piece arrives with fresh mill scale / rust on its joint faces
     shared.plates = plates;
   }
 
@@ -96,6 +97,7 @@ export function startApp(STATIONS) {
     STATIONS.forEach(s => { if (s.root) s.root.visible = s.id === id; });
     state.station = id; ambience && ambience(id);
     if (fitup) { fitup.unmount(id, false); fitup.reset(); }
+    if (clean) clean.freshRust();
     state.explore = { sel: 0, labels: false, exploded: false };
     state.op = {};
     const s = S();
@@ -152,15 +154,22 @@ export function startApp(STATIONS) {
       setAssist(state.assist);
       const fx = fitup.st, isCut = proc.kind === 'cut';
       if (isCut) fitup.unmount(state.station, false);
-      else if (fx.done) { if (!fx.mounted) fitup.mount(state.station, false); }
-      else { fitup.unmount(state.station, false); }
+      else {
+        // the weld is ALWAYS done in the chosen position: if the trainee skipped the fit-up steps, the piece is tacked
+        // and mounted in the positioner for him (unclean edges still cost porosity)
+        if (!fx.done) { fx.tacks = [true, true, true]; fx.done = true; fx.cleaned = fx.cleanDone ? fx.cleaned : clean.cleanFrac(); const P = fitup.POS[fitup.cur(state.station).pos]; setTimeout(() => showToast('info', 'تم تثبيت القطعة بالمشبك في وضع ' + P.name + '. ' + (fx.cleaned < 0.8 ? 'لم تنظّف الحواف من الصدأ، فقد تظهر مسامية.' : '')), 400); }
+        if (!fx.mounted || fitup.st.k < 1) fitup.mount(state.station, false);
+      }
       state.prep = { clean: isCut ? 1 : fx.done ? fx.cleaned : 0, done: isCut || fx.done };
       const ex = isCut ? null : fitup.cur(state.station);
       sim.gLocal = fitup.gravityLocal(); sim.exercise = fx.done ? ex : null;
       state.work = 0; state.workIdeal = sim.exercise && sim.exercise.work != null ? sim.exercise.work : null;
       sim.dirty = Math.max(0, 0.85 - state.prep.clean);
       if (!state.prep.done) clean.start('pre');
+      clean.showRust(!isCut && state.prep.clean < 0.97);   // whatever rust was left stays on the mounted piece
     }
+    if (st === 'fitup') clean.showRust(!isCutTask());
+    if (st !== 'weld' && st !== 'fitup' && clean) clean.showRust(false);
     E.controls.maxPolarAngle = st === 'weld' || st === 'inspect' || st === 'fitup' ? 2.7 : 1.52;   // overhead work is watched from below
     if (camFill) camFill.intensity = st === 'weld' || st === 'inspect' || st === 'fitup' ? 0.9 : 0;
     E.poke(st === 'inspect' ? 9000 : 2500);
@@ -967,7 +976,7 @@ export function startApp(STATIONS) {
     else if (a === 'finish') finishWeld();
     else if (a === 'slag') { if (sim.startSlagRemoval()) { showToast('info', 'جارٍ تكسير الخبث بالمطرقة…'); [0, 180, 360, 540, 720, 900].forEach(d => setTimeout(() => audio.sfx('chip'), d)); } }
     else if (a === 'clean-skip') { clean.skip(); }
-    else if (a && a.startsWith('ex:')) { state.fitBusy = false; fitup.select(state.station, a.slice(3)); platesOpts = ''; setPlates({ kind: 'butt' }); fitup.apply(fitup.cur(state.station), 0); s.onExercise && s.onExercise(fitup.cur(state.station), ctx); const c = fitupCamera(); E.flyTo(c.pos, c.target, 0.8); renderPanel(); renderTacks();
+    else if (a && a.startsWith('ex:')) { state.fitBusy = false; fitup.select(state.station, a.slice(3)); platesOpts = ''; setPlates({ kind: 'butt' }); fitup.apply(fitup.cur(state.station), 0); clean.showRust(true); s.onExercise && s.onExercise(fitup.cur(state.station), ctx); const c = fitupCamera(); E.flyTo(c.pos, c.target, 0.8); renderPanel(); renderTacks();
       // short preview: the work is lifted into its welding position and put back, so the student sees the position before preparing it
       const sid = state.station, exx = fitup.cur(sid); if (fitup.POS[exx.pos].lift > 0 || exx.pos === '1F') { showToast('info', 'معاينة الوضع: ' + fitup.POS[exx.pos].name); setTimeout(() => state.stage === 'fitup' && fitup.cur(sid) === exx && !fitup.st.done && !state.fitBusy && fitup.mount(sid, true, () => setTimeout(() => state.stage === 'fitup' && !fitup.st.done && fitup.unmount(sid, true), 1400)), 900); } }
     else if (a === 'fit-clean') { state.fitBusy = true; fitup.unmount(state.station, false); clean.start('pre'); renderClean(); const c = cleanCamera(); E.flyTo(c.pos, c.target, 0.8); }

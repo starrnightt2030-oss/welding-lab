@@ -181,6 +181,7 @@ function buildJointPlates(M, o) {
     g.add(profilePlate([[Z - 0.07, Y0], [Z + 0.05, Y0], [Z + 0.05, Y0 + t1], [Z - 0.07, Y0 + t1]], L, mat));
     g.add(profilePlate([[Z - 0.09, Y0 + t1], [Z, Y0 + t1], [Z, Y0 + t1 + t2], [Z - 0.09, Y0 + t1 + t2]], L, mat));
     JOINT.t = Math.min(t1, t2); JOINT.y = Y0 + t1; JOINT.kind = 'lap';
+    JOINT.surf = z => z < Z ? Y0 + t1 + t2 : Y0 + t1;   // top plate surface behind the lap edge, bottom plate in front
     [0.205, 0.395].forEach(x => tack(x, JOINT.y + 0.0018, Z + 0.0018, 0.5));
   }
   g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
