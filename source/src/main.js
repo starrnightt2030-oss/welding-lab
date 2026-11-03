@@ -1,3 +1,4 @@
+import { startUpdateCheck } from './update.js';
 import { startApp } from './core/app.js';
 import smaw from './stations/smaw.js';
 import oaw from './stations/oaw.js';
@@ -6,4 +7,5 @@ import makeWire from './stations/mig.js';
 import caw from './stations/caw.js';
 import safety from './stations/safety.js';
 
+startUpdateCheck();
 startApp([safety, smaw, oaw, caw, makeWire('co2'), tig, makeWire('mig')]);

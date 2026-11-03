@@ -197,7 +197,7 @@ export class WeldSim {
     if (this.ripples.length >= MAX_RIPPLES) return;
     const p = this.proc;
     const dims = p.dims(s);
-    const w = dims.w / 1000, h = dims.h / 1000;
+    let w = dims.w / 1000, h = dims.h / 1000;
     const wob = (Math.random() - 0.5) * 0.0004 * (dims.wobble ?? 1);
     let zOff = 0, hk = 1;
     const ex = this.exercise, g = this.gLocal, id0 = p.ideal;
@@ -209,7 +209,10 @@ export class WeldSim {
       if (g.y > 0.6 && slow > 0.3 && Math.random() < 0.3) this.addRoll(x, JOINT.z + (Math.random() - 0.5) * w * 0.4, w * 0.3, h * 1.6);   // overhead: drops
     }
     if (ex && ex.work != null) zOff += Math.sin(THREE.MathUtils.degToRad(this._work || 0)) * w * 0.5;
-    const r = { x, w, h: h * hk, z: JOINT.z + wob + zOff, born: this.time, s: { speed: s.speed, dist: s.dist, angle: s.angle, aux: s.aux } };
+    // fillet (tee / lap): the bead sits in a 90° corner, so it must fill the corner and stand proud of both faces
+    let wk = 1;
+    if (ex && (ex.kind === 'tee' || ex.kind === 'lap') && p.kind !== 'cut') { h = Math.max(h * 1.15, w * 0.68) + h * 0.25; wk = 1.15; }
+    const r = { x, w: w * wk, h: h * hk, z: JOINT.z + wob + zOff, born: this.time, s: { speed: s.speed, dist: s.dist, angle: s.angle, aux: s.aux } };
     this.ripples.push(r);
     const i = this.ripples.length - 1;
     if (p.kind === 'cut') {
@@ -223,6 +226,7 @@ export class WeldSim {
       }
       return;
     }
+    w = r.w; h = r.h; this._toe = wk > 1 ? w * 0.4 : 0;   // fillet toes sit up on the two faces of the corner
     this.inst(this.bead, i, x, JOINT.y, r.z, w * 0.42, h, w * 0.5);
     this.inst(this.glow, i, x, JOINT.y, r.z, w * 0.44, h * 1.04, w * 0.52);
     this.bead.count = this.glow.count = i + 1;
@@ -243,11 +247,11 @@ export class WeldSim {
     if (this.dirty && Math.random() < this.dirty * 0.22) this.addPore(x, r.z, w, h);
   }
   addRoll(x, z, w, h) {   // overlap: metal rolls over the plate past the toe without fusing
-    [-1, 1].forEach(sd => { const i = this.rolls.count; if (i >= 500) return; this.inst(this.rolls, i, x, JOINT.y + h * 0.25, z + sd * (w * 0.5 + 0.0007), 0.0009, h * 0.55, 0.0011); this.rolls.count++; });
+    [-1, 1].forEach(sd => { const i = this.rolls.count; if (i >= 500) return; this.inst(this.rolls, i, x, JOINT.y + h * 0.25 + (this._toe || 0), z + sd * (w * (this._toe ? 0.4 : 0.5) + 0.0007), 0.0009, Math.min(h * 0.55, 0.003), 0.0011); this.rolls.count++; });
     this.rolls.instanceMatrix.needsUpdate = true;
   }
   addColdLap(x, z, w) {   // lack of fusion at the toes: a dark slit between bead and plate
-    [-1, 1].forEach(sd => { const i = this.under.count; if (i >= 700) return; this.inst(this.under, i, x, JOINT.y + 0.0001, z + sd * (w * 0.46), 0.0012, 0.0002, 0.0004); this.under.count++; });
+    [-1, 1].forEach(sd => { const i = this.under.count; if (i >= 700) return; this.inst(this.under, i, x, JOINT.y + 0.0001 + (this._toe || 0), z + sd * (w * (this._toe ? 0.38 : 0.46)), 0.0012, 0.0002, 0.0004); this.under.count++; });
     this.under.instanceMatrix.needsUpdate = true;
   }
   addCrater(x) {   // abrupt stop: crater with a star crack
@@ -279,7 +283,7 @@ export class WeldSim {
     const k = this.poreRim.count; if (k < 240) { this.inst(this.poreRim, k, x, JOINT.y + h * 0.93, pz, r * 1.05, r * 0.9, r * 1.05); this.poreRim.count++; this.poreRim.instanceMatrix.needsUpdate = true; }
   }
   addUndercut(x, z, w) {   // groove melted into the plate along both toes
-    [-1, 1].forEach(s => { const i = this.under.count; if (i >= 700) return; this.inst(this.under, i, x, JOINT.y + 0.00008, z + s * (w * 0.5 + 0.00045), 0.0013, 0.00012, 0.0009); this.under.count++; });
+    [-1, 1].forEach(s => { const i = this.under.count; if (i >= 700) return; this.inst(this.under, i, x, JOINT.y + 0.00008 + (this._toe || 0), z + s * (w * (this._toe ? 0.4 : 0.5) + 0.00045), 0.0013, 0.00012, 0.0009); this.under.count++; });
     this.under.instanceMatrix.needsUpdate = true;
   }
 
@@ -346,13 +350,19 @@ export class WeldSim {
     const s = this.smoke.find(q => q.life <= 0); if (!s) return;
     s.life = 2.5 + Math.random(); s.max = s.life; s.s.visible = true;
     s.s.position.set(x, y + 0.01, JOINT.z); s.s.scale.setScalar(0.02); s.vx = (Math.random() - 0.5) * 0.02;
+    const g = this.gLocal; if (g && g.y > -0.9) { s.s.position.set(x, y, JOINT.z).addScaledVector(g, -0.01); if (g.y > 0.3) s.s.position.y = y + 0.004; }   // smoke rises in the WORLD up direction
   }
   updateSmoke(dt) {
     this.smoke.forEach(q => {
       if (q.life <= 0) { q.s.visible = false; return; }
       q.life -= dt; const k = 1 - q.life / q.max;
-      q.s.position.y += dt * 0.08; q.s.position.x += q.vx * dt;
-      q.s.scale.setScalar(0.02 + k * 0.16); q.s.material.opacity = Math.sin(Math.PI * k) * 0.22;
+      const g = this.gLocal;
+      const over = g && g.y > 0.3;   // overhead: smoke hugs the underside of the plate and spreads thinly along it
+      if (over) q.s.position.x += (q.vx > 0 ? 1 : -1) * dt * 0.02;
+      else if (g && g.y > -0.9) q.s.position.addScaledVector(g, -dt * 0.08);
+      else q.s.position.y += dt * 0.08;
+      q.s.position.x += q.vx * dt;
+      q.s.scale.setScalar(0.02 + k * (over ? 0.07 : 0.16)); q.s.material.opacity = Math.sin(Math.PI * k) * (over ? 0.1 : 0.22);
     });
   }
 

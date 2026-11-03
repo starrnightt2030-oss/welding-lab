@@ -132,6 +132,7 @@ export function buildPlates(M, opts = {}) {
   const kind = opts.kind || 'butt';
   if (kind === 'tee' || kind === 'lap' || (kind === 'butt' && opts.t2 && opts.t2 !== opts.t)) return buildJointPlates(M, opts);
   const T = opts.t ?? PLATE_T;
+  JOINT.surf = null;
   const R = kind === 'single' ? 0.035 : 0;   // cutting plate sits on two steel bars so the kerf is open underneath
   JOINT.t = T; JOINT.y = TABLE_Y + R + T; JOINT.kind = kind;
   const g = new THREE.Group();
@@ -160,6 +161,7 @@ export function buildPlates(M, opts = {}) {
 // fit-up exercises: T-joint (fillet), lap joint, and butt joint of two different thicknesses (thick plate tapered 1:4)
 function buildJointPlates(M, o) {
   const kind = o.kind, t1 = o.t, t2 = o.t2 ?? o.t, L = 0.2, Z = JOINT.z, Y0 = TABLE_Y;
+  JOINT.surf = null;
   const g = new THREE.Group(), mat = M.plate, edge = M.plateEdge;
   const tackMat = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8 });
   const tack = (x, y, z, s) => { const t = mesh(new THREE.SphereGeometry(0.0055, 14, 10), tackMat); t.scale.set(1.3, s, s); t.position.set(x, y, z); g.add(t); return t; };
@@ -168,6 +170,7 @@ function buildJointPlates(M, o) {
     g.add(profilePlate([[Z - gap / 2 - 0.08, Y0], [Z - gap / 2, Y0], [Z - gap / 2, Y0 + thin], [Z - gap / 2 - 0.08, Y0 + thin]], L, mat));
     g.add(profilePlate([[Z + gap / 2, Y0], [Z + gap / 2 + 0.08, Y0], [Z + gap / 2 + 0.08, Y0 + thick], [Z + gap / 2 + taper, Y0 + thick], [Z + gap / 2, Y0 + thin]], L, mat));
     JOINT.t = thin; JOINT.y = Y0 + thin; JOINT.kind = 'butt';
+    JOINT.surf = z => z <= Z + gap / 2 ? Y0 + thin : Y0 + thin + Math.min(1, (z - Z - gap / 2) / taper) * (thick - thin);
     [0.205, 0.395].forEach(x => tack(x, JOINT.y + 0.0006, Z, 0.4));
   } else if (kind === 'tee') {      // base plate t1 on the bench, web t2 standing on it; fillet in the front corner
     g.add(profilePlate([[Z - 0.06, Y0], [Z + 0.06, Y0], [Z + 0.06, Y0 + t1], [Z - 0.06, Y0 + t1]], L, mat));

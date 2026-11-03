@@ -1,9 +1,16 @@
+import { createIntro3D } from './intro3d.js';
 // Animated welcome screen: sparks from the cartoon welder's arc, then "enter" → sting + spoken welcome.
 export const WELCOME = 'مرحباً بكم في معمل محاكاة عمليات اللحام الافتراضي.';
 export function runIntro() {
   try { const v = document.querySelector('meta[name=build]'); const el = document.getElementById('app-ver'); if (v && el) el.textContent = 'إصدار ' + v.content + (location.protocol === 'file:' ? ' — نسخة بدون إنترنت' : ''); } catch (e) {}
   const root = document.getElementById('loading'), g = document.getElementById('sparks');
   if (!root || !g) return { ready() {}, };
+  // 3D hero welder replaces the flat drawing as soon as WebGL is up
+  let hero3d = null;
+  try {
+    const art = root.querySelector('.intro-art');
+    if (art && !/[?&]nointro/.test(location.search)) { const host = document.createElement('div'); host.className = 'intro-3d'; art.appendChild(host); hero3d = createIntro3D(host, () => art.classList.add('r3d')); }
+  } catch (e) { hero3d = null; console.error('intro3d', e); }
   const NS = 'http://www.w3.org/2000/svg', pool = [];
   for (let i = 0; i < 70; i++) { const l = document.createElementNS(NS, 'line'); l.setAttribute('class', 'spk'); l.setAttribute('stroke-linecap', 'round'); l.style.display = 'none'; g.appendChild(l); pool.push({ el: l, life: 0 }); }
   let t0 = performance.now(), alive = true, boost = 0;
@@ -35,8 +42,8 @@ export function runIntro() {
       const btn = document.getElementById('intro-start'), ld = root.querySelector('.intro-load');
       if (ld) ld.hidden = true; if (btn) btn.hidden = false;
       if (/[?&]nointro/.test(location.search)) { root.classList.add('go'); return Promise.resolve(); }
-      return new Promise(res => { const go = () => { boost = 1.2; root.classList.add('go'); res(); }; btn ? btn.addEventListener('click', go, { once: true }) : go(); });
+      return new Promise(res => { const go = () => { boost = 1.2; hero3d && hero3d.boost(); root.classList.add('go'); res(); }; btn ? btn.addEventListener('click', go, { once: true }) : go(); });
     },
-    finish() { root.classList.add('done'); setTimeout(() => { alive = false; root.style.display = 'none'; }, 1000); }
+    finish() { root.classList.add('done'); setTimeout(() => { alive = false; hero3d && hero3d.stop(); root.style.display = 'none'; }, 1000); }
   };
 }

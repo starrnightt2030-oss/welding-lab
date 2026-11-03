@@ -37,7 +37,7 @@ export function startApp(STATIONS) {
     weld: { pressing: false, x: JOINT.x0, dist: 20, aux: false },
     report: null, showDef: false, drawer: true, op: {}, voice: voice.enabled
   };
-  let clean = null, fitup = null, ambience = null, M, sim, plates, hammer, brush, platesOpts = '', booted = false;
+  let clean = null, fitup = null, ambience = null, M, sim, plates, hammer, brush, platesOpts = '', booted = false, camFill = null;
   const shared = {};
 
   const ctx = {
@@ -64,6 +64,10 @@ export function startApp(STATIONS) {
     fitup = createFitup({ E, audio, toast: (t, m) => showToast(t, m), say: t => voice.say(t) });
     fitup.posFrame.add(plates);
     sim = new WeldSim(E.scene); fitup.jointFrame.add(sim.group);
+    // a soft light from the trainee's eyes (like a helmet/work lamp) so the bead's ripples read in every position
+    if (!E.camera.parent) E.scene.add(E.camera);
+    camFill = new THREE.DirectionalLight(0xfff1dc, 0); camFill.position.set(0.15, 0.25, 0.2); camFill.target.position.set(0, -0.05, -1);
+    E.camera.add(camFill, camFill.target);
     clean = createCleaning({ E, audio, sim, hammer, brush, onChange: onClean });
     for (const S of STATIONS) {
       if (!S.ready) continue;
@@ -157,6 +161,8 @@ export function startApp(STATIONS) {
       sim.dirty = Math.max(0, 0.85 - state.prep.clean);
       if (!state.prep.done) clean.start('pre');
     }
+    E.controls.maxPolarAngle = st === 'weld' || st === 'inspect' || st === 'fitup' ? 2.7 : 1.52;   // overhead work is watched from below
+    if (camFill) camFill.intensity = st === 'weld' || st === 'inspect' || st === 'fitup' ? 0.9 : 0;
     E.poke(st === 'inspect' ? 9000 : 2500);
     if (st === 'inspect') {
       if (!state.report) state.report = sim.proc ? sim.evaluate() : null; s.inspectEnter && s.inspectEnter(ctx);
@@ -188,7 +194,24 @@ export function startApp(STATIONS) {
   }
   function renderAll() { renderTopbar(); renderPanel(); renderHotspots(); renderHUD(); applyViewOffset(); }
 
-  function weldCamera() { const c = weldCameraLocal(); if (fitup) { fitup.posFrame.updateMatrixWorld(true); const m = fitup.posFrame.matrixWorld; c.pos.applyMatrix4(m); c.target.applyMatrix4(m); } return c; }
+
+  function weldCamera() {
+    const c = weldCameraLocal(); if (!fitup) return c;
+    fitup.posFrame.updateMatrixWorld(true);
+    const W = fitup.W(), d = c.pos.distanceTo(c.target);
+    const n = new THREE.Vector3(0, 1, 0).transformDirection(W);   // outward normal of the joint (bisector for fillets)
+    c.target.applyMatrix4(W);
+    let dir;
+    if (n.y > 0.7) dir = new THREE.Vector3(0, 0.62, 0.78).transformDirection(fitup.posFrame.matrixWorld);   // flat: as before
+    else {   // look INTO the joint along its open side, from the trainee's side; a little above unless the joint faces down
+      dir = n.clone().multiplyScalar(0.8).add(V3(0, n.y > -0.3 ? 0.28 : 0, 0.55));
+      if (dir.clone().normalize().dot(n) < 0.55) dir.lerp(n, 0.5);
+      dir.normalize().add(V3(n.y < -0.3 ? 0.55 : 0.35, 0, 0));   // stand a little to the side so the electrode / torch never blocks the view (or the lens)
+    }
+    if (dir.y < 0 && c.target.y + dir.y * d < TABLE_Y + 0.03) dir.y = (TABLE_Y + 0.05 - c.target.y) / d;     // never under the bench top
+    c.pos.copy(c.target).addScaledVector(dir.normalize(), d);
+    return c;
+  }
   function weldCameraLocal() {
     const aspect = viewport.clientWidth / Math.max(1, viewport.clientHeight);
     const vf = THREE.MathUtils.degToRad(E.camera.fov), hf = 2 * Math.atan(Math.tan(vf / 2) * aspect);
@@ -213,11 +236,11 @@ export function startApp(STATIONS) {
     const next = steps.findIndex(x => !x[0]);
     return `<section class="card"><h3 class="sm">اختر التمرين</h3><div class="ex-list">${fitup.list(sid).map(e => `<button type="button" class="ex ${e.id === ex.id ? 'on' : ''}" data-act="ex:${e.id}"><b>${e.name}</b><span>${e.ship}</span><i>${fitup.JOINT_NAME[e.kind]} • ${e.t === e.t2 ? e.t + ' مم' : e.t + ' + ' + e.t2 + ' مم'} • ${fitup.POS[e.pos].name}</i></button>`).join('')}</div></section>
       <section class="card"><h3 class="sm">خطوات التجهيز</h3><ol class="steps">${steps.map(([ok, t], i) => `<li class="${ok ? 'done' : i === next ? 'cur' : ''}"><i>${ok ? ICON.check : AR(i + 1)}</i><span>${t}</span></li>`).join('')}</ol>
-        ${next === 0 ? `<button type="button" class="btn primary" data-act="fit-clean">${ICON.hand}ابدأ التنظيف بالفرشاة</button>` : next === 1 ? '<p class="muted small">المس الدوائر الثلاث على الوصلة: الطرفان ثم المنتصف.</p>' : next === 2 ? `<button type="button" class="btn primary" data-act="fit-mount">${ICON.target}ثبّت في وضع ${fitup.POS[ex.pos].name}</button>` : ''}
+        ${next === 0 ? `<button type="button" class="btn primary" data-act="fit-clean">${ICON.hand}ابدأ التنظيف بالفرشاة</button>` : next === 1 ? `<p class="muted small">المس الدوائر البرتقالية الثلاث على الوصلة، أو اضغط هنا:</p><div class="row3">${[0, 1, 2].map(i => `<button type="button" class="btn sm ${fx.tacks[i] ? 'on-green' : ''}" data-act="tack:${i}">${fx.tacks[i] ? ICON.check : ''}${['الطرف الأيمن', 'الطرف الأيسر', 'المنتصف'][i]}</button>`).join('')}</div>` : next === 2 ? `<button type="button" class="btn primary" data-act="fit-mount">${ICON.target}ثبّت في وضع ${fitup.POS[ex.pos].name}</button>` : ''}
         <p class="small">${fitup.POS_TIP[ex.pos]}${ex.work != null && ex.work > 0 ? ' وجّه الأداة نحو اللوح الأسمك بزاوية عمل حوالي ' + AR(ex.work) + '° حتى تنصهر حافتاه بالتساوي.' : ''}</p></section>
       <button type="button" class="btn primary big" data-go="operate" data-mark="fitup" ${fx.mounted ? '' : 'disabled'}>التالي: اضبط الماكينة ${ICON.next}</button>`;
   }
-  const tackLayer = $('#hotspots');
+  const tackLayer = $('#tacks');
   function renderTacks() {
     [...document.querySelectorAll('.tackpt')].forEach(b => b.remove());
     if (state.stage !== 'fitup' || isCutTask() || !fitup.st.cleanDone || fitup.st.tacks.every(Boolean)) return;
@@ -944,10 +967,12 @@ export function startApp(STATIONS) {
     else if (a === 'finish') finishWeld();
     else if (a === 'slag') { if (sim.startSlagRemoval()) { showToast('info', 'جارٍ تكسير الخبث بالمطرقة…'); [0, 180, 360, 540, 720, 900].forEach(d => setTimeout(() => audio.sfx('chip'), d)); } }
     else if (a === 'clean-skip') { clean.skip(); }
-    else if (a && a.startsWith('ex:')) { fitup.select(state.station, a.slice(3)); platesOpts = ''; setPlates({ kind: 'butt' }); fitup.apply(fitup.cur(state.station), 0); s.onExercise && s.onExercise(fitup.cur(state.station), ctx); const c = fitupCamera(); E.flyTo(c.pos, c.target, 0.8); renderPanel(); renderTacks(); }
-    else if (a === 'fit-clean') { clean.start('pre'); renderClean(); const c = cleanCamera(); E.flyTo(c.pos, c.target, 0.8); }
+    else if (a && a.startsWith('ex:')) { state.fitBusy = false; fitup.select(state.station, a.slice(3)); platesOpts = ''; setPlates({ kind: 'butt' }); fitup.apply(fitup.cur(state.station), 0); s.onExercise && s.onExercise(fitup.cur(state.station), ctx); const c = fitupCamera(); E.flyTo(c.pos, c.target, 0.8); renderPanel(); renderTacks();
+      // short preview: the work is lifted into its welding position and put back, so the student sees the position before preparing it
+      const sid = state.station, exx = fitup.cur(sid); if (fitup.POS[exx.pos].lift > 0 || exx.pos === '1F') { showToast('info', 'معاينة الوضع: ' + fitup.POS[exx.pos].name); setTimeout(() => state.stage === 'fitup' && fitup.cur(sid) === exx && !fitup.st.done && !state.fitBusy && fitup.mount(sid, true, () => setTimeout(() => state.stage === 'fitup' && !fitup.st.done && fitup.unmount(sid, true), 1400)), 900); } }
+    else if (a === 'fit-clean') { state.fitBusy = true; fitup.unmount(state.station, false); clean.start('pre'); renderClean(); const c = cleanCamera(); E.flyTo(c.pos, c.target, 0.8); }
     else if (a && a.startsWith('tack:')) doTack(+a.slice(5));
-    else if (a === 'fit-mount') { fitup.mount(state.station, true, () => { fitup.st.done = true; renderPanel(); showToast('good', 'القطعة مثبتة في وضع ' + fitup.POS[fitup.cur(state.station).pos].name + '. اضبط الماكينة ثم ابدأ اللحام.'); const c = weldCamera(); E.flyTo(c.pos.clone().lerp(c.target, -0.6), c.target, 1.0); }); }
+    else if (a === 'fit-mount') { fitup.st.done = true; fitup.mount(state.station, true, () => { fitup.st.done = true; renderPanel(); showToast('good', 'القطعة مثبتة في وضع ' + fitup.POS[fitup.cur(state.station).pos].name + '. اضبط الماكينة ثم ابدأ اللحام.'); E.controls.maxPolarAngle = 2.7; const c = weldCamera(); E.flyTo(c.pos.clone().lerp(c.target, -0.35), c.target, 1.0); }); }
     else if (a === 'def-focus') { focusDefect(+el.dataset.i, +(el.dataset.j || 0)); }
     else if (a === 'def-close') { $('#defcard').hidden = true; }
     else if (a === 'defects') { state.showDef = !state.showDef; showDefects(state.showDef); renderPanel(); }
@@ -1017,7 +1042,7 @@ export function startApp(STATIONS) {
   })();
 
   if (/[?&]debug/.test(location.search)) window.__wl = {
-    state, ctx, JOINT, goStage, enterStation, goHub, finishWeld, E, sim: () => sim, S, voice, spoken: (() => { const a = []; const o = voice.say.bind(voice); voice.say = (t, p) => { a.push(t); return o(t, p); }; return a; })(),
+    state, ctx, JOINT, fitup: () => fitup, weldCamera: () => weldCamera(), goStage, enterStation, goHub, finishWeld, E, sim: () => sim, S, voice, spoken: (() => { const a = []; const o = voice.say.bind(voice); voice.say = (t, p) => { a.push(t); return o(t, p); }; return a; })(),
     simulate(secs = 50, opts = {}) {
       const dt = 1 / 60, proc = sim.proc; let x = JOINT.x0;
       const sp = opts.speed ?? (proc.ideal.speed[0] + proc.ideal.speed[1]) / 2, dd = opts.dist ?? (proc.ideal.dist[0] + proc.ideal.dist[1]) / 2;

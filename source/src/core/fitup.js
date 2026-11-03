@@ -96,17 +96,20 @@ export function createFitup({ E, audio, toast, say, onMounted }) {
     }
     E.poke && E.poke(300);
   }
+  let tw = null;   // only one positioner motion at a time (a preview must never fight the real mount)
+  const stopTw = () => { if (tw) { const i = E.tweens.indexOf(tw); if (i >= 0) E.tweens.splice(i, 1); tw = null; } };
   function mount(sid, animate = true, done) {
     const ex = cur(sid);
-    if (!animate) { apply(ex, 1); st.mounted = true; done && done(); return; }
-    audio.sfx('clunk');
-    E.tween(1.3, k => apply(ex, k * k * (3 - 2 * k)), () => { st.mounted = true; onMounted && onMounted(ex); done && done(); });
+    if (!animate) { stopTw(); apply(ex, 1); st.mounted = true; done && done(); return; }
+    audio.sfx('clunk'); stopTw(); const k0 = st.k;
+    tw = E.tween(1.3 * (1 - k0) + 0.05, k => { k = k * k * (3 - 2 * k); apply(ex, k0 + (1 - k0) * k); }, () => { tw = null; st.mounted = true; onMounted && onMounted(ex); done && done(); });
   }
   function unmount(sid, animate = true, done) {
     const ex = cur(sid);
-    if (!st.mounted && st.k === 0) { apply(ex, 0); done && done(); return; }
-    if (!animate) { apply(ex, 0); st.mounted = false; done && done(); return; }
-    E.tween(1.0, k => apply(ex, 1 - k * k * (3 - 2 * k)), () => { st.mounted = false; done && done(); });
+    if (!st.mounted && st.k === 0 && !tw) { apply(ex, 0); done && done(); return; }
+    if (!animate) { stopTw(); apply(ex, 0); st.mounted = false; done && done(); return; }
+    stopTw(); const k0 = st.k;
+    tw = E.tween(1.0 * k0 + 0.05, k => apply(ex, k0 * (1 - k * k * (3 - 2 * k))), () => { tw = null; st.mounted = false; done && done(); });
   }
   const W = () => { jointFrame.updateMatrixWorld(true); return jointFrame.matrixWorld; };
   const flat = () => st.k === 0 && (!jointFrame.matrix || jointFrame.matrix.equals(new THREE.Matrix4()));

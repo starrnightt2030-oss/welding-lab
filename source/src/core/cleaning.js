@@ -61,7 +61,7 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
     if (kind === 'pre') { paintRust(); rust.visible = true; const w = RX1() - RX0(); rust.scale.set(w, 2 * RZ, 1); rust.position.set((RX0() + RX1()) / 2, JOINT.y + 0.0004, JOINT.z); }
     pose(null, true);
     const tool = kind === 'chip' ? hammer : brush;
-    tool.position.set(0.3, JOINT.y + 0.03, JOINT.z + 0.03); tool.rotation.set(0, kind === 'chip' ? Math.PI * 0.8 : 0.9, 0); tool.scale.setScalar(0.7);
+    tool.position.set(0.3, JOINT.y + 0.03, JOINT.z + 0.03); tool.rotation.set(0, kind === 'chip' ? Math.PI * 0.8 : -0.4, kind === 'chip' ? 0 : 0.32); tool.scale.setScalar(kind === 'chip' ? 0.7 : 0.45);
     E.controls.enabled = false; update();
   }
   function stop() { if (!mode) return; mode = null; rust.visible = false; pose(null, false); E.controls.enabled = true; pressed = false; }
@@ -77,12 +77,12 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
     if (phase === 'up') { pressed = false; lastX = null; return true; }
     if (!p) return true;
     const tool = mode.kind === 'chip' ? hammer : brush;
-    const x = THREE.MathUtils.clamp(p.x, JOINT.x0 - 0.02, JOINT.x1 + 0.02), z = THREE.MathUtils.clamp(p.z, JOINT.z - 0.04, JOINT.z + 0.04);
+    const x = THREE.MathUtils.clamp(p.x, JOINT.x0 - 0.02, JOINT.x1 + 0.02), z = THREE.MathUtils.clamp(p.z, (JOINT.kind === 'tee' || JOINT.kind === 'lap') ? JOINT.z + 0.012 : JOINT.z - 0.04, JOINT.z + 0.04);
     if (mode.kind === 'chip') {
       tool.position.set(x, JOINT.y + 0.1 + (pressed ? 0 : 0.02), JOINT.z + 0.004);
       if (phase === 'down') { swing = 1; strike(x); }
     } else {
-      tool.position.set(x, JOINT.y + 0.0025, z);
+      tool.position.set(x, (JOINT.surf ? JOINT.surf(z) : JOINT.y) + 0.003 + 0.07 * 0.45 * Math.sin(0.32), z);
       if (pressed) {
         scrub += Math.abs((lastX ?? x) - x) + 0.0005; lastX = x;
         if (mode.kind === 'pre') { if (scrubAt(x, z)) { if (Math.random() < 0.3) audio.sfx('chip'); mode.prog = cleanFrac(); } }
@@ -112,7 +112,7 @@ export function createCleaning({ E, audio, sim, hammer, brush, onChange }) {
         void prev;
       } else hammer.rotation.set(-0.6, Math.PI * 0.8, 0);
       void base;
-    } else if (pressed) { brush.rotation.z = Math.sin(performance.now() / 45) * 0.06; }
+    } else if (pressed) { brush.rotation.z = 0.32 + Math.sin(performance.now() / 45) * 0.04; }
   }
   return { start, stop, skip, pointer, frame, get active() { return !!mode; }, get kind() { return mode && mode.kind; }, get prog() { return mode ? mode.prog : 0; }, cleanFrac };
 }
