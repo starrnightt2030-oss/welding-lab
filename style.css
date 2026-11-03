@@ -496,3 +496,16 @@ body.pad-edit .stick,body.pad-edit #aux-btn{outline:3px dashed #ffd166;outline-o
 .pad-bar span{font-size:.8rem;color:var(--muted)}
 .pad-bar button{border:1px solid var(--line2);background:var(--surface2);color:var(--text);border-radius:.6rem;padding:.45rem .7rem;font:600 .82rem "IBM Plex Sans Arabic",sans-serif;cursor:pointer}
 .pad-bar button.on,.pad-bar button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ---------- fit-up exercises ---------- */
+.ex-list{display:flex;flex-direction:column;gap:.5rem}
+.ex{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem;text-align:right;padding:.65rem .8rem;border-radius:.8rem;border:1px solid var(--line2);background:var(--surface2);color:var(--text);cursor:pointer;font:inherit}
+.ex b{font-size:.95rem}.ex span{font-size:.8rem;color:var(--text2);line-height:1.5}.ex i{font-style:normal;font-size:.75rem;color:var(--accent2)}
+.ex.on{border-color:var(--accent);background:rgba(47,127,240,.16);box-shadow:inset 3px 0 0 var(--red)}
+.tackpt{position:absolute;left:0;top:0;width:2.6rem;height:2.6rem;margin:-1.3rem 0 0 -1.3rem;border-radius:50%;border:3px solid #ffb347;background:rgba(255,140,40,.18);box-shadow:0 0 0 6px rgba(255,180,70,.18);cursor:pointer;animation:tackp 1.2s ease-in-out infinite}
+@keyframes tackp{50%{box-shadow:0 0 0 12px rgba(255,180,70,.05)}}
+.work-ctl{position:absolute;left:50%;bottom:4.9rem;transform:translateX(-50%);display:flex;align-items:center;gap:.6rem;padding:.45rem .8rem;border-radius:.9rem;z-index:5;width:min(30rem,70vw)}
+.work-ctl label{font-size:.8rem;white-space:nowrap}.work-ctl label small{color:var(--muted)}
+.work-ctl .wk{position:relative;flex:1}.work-ctl input{width:100%}
+.work-ctl .ideal{position:absolute;top:-.35rem;width:3px;height:1.4rem;margin-left:-1.5px;background:var(--good);border-radius:2px;pointer-events:none}
+body.sticks-mode .work-ctl{bottom:auto;top:4.6rem}

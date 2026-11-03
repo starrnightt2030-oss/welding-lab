@@ -103,7 +103,7 @@ export class Voice {
       if (tok !== this.token) return;
       if (p.gap) { await new Promise(r => setTimeout(r, p.gap * 1000)); continue; }
       if (p.id) { const b = await this.load(p.id); if (tok !== this.token) return; if (b) await this.play(b, tok); }
-      else if (p.text) { this.missing.add(p.text); await this.speakTTS(p.text, tok); }
+      else if (p.text) { this.missing.add(p.text); if (this.allowTTS) await this.speakTTS(p.text, tok); }   // never switch to a different (device) voice mid-sentence
     }
     if (tok === this.token) this.busy = false;
   }

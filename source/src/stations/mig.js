@@ -163,6 +163,7 @@ S.build = ctx => {
 S.pickables = () => S._pick;
 S.exploreMap = { plugT: 'euro', plugG: 'clamp', sockets: 'clamp', switch: 'machine', spoolBox: 'spool' };
 S.enter = ctx => ctx.setPlates({ t: 0.006, kind: 'butt' });
+S.onExercise = ex => { st.thick = ex.t >= 6 || ex.t2 >= 6 ? 6 : 3; };
 
 const POSE = {
   torchRest: { p: V3(0.64, TABLE_Y + 0.021, 0.22), r: new THREE.Euler(0, Math.PI + 0.25, 0) },

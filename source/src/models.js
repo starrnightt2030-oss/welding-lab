@@ -121,8 +121,17 @@ export function buildTable(M) {
 
 // ---------------- Plates ----------------
 // kind: 'butt' (two plates, square butt joint with tack welds) | 'single' (one plate with a soapstone cut line)
+// extruded plate from a cross-section profile given as [z, y] points (extruded along X over the joint length)
+function profilePlate(pts, L, mats) {
+  const sh = new THREE.Shape(); pts.forEach(([z, y], i) => i ? sh.lineTo(-z, y) : sh.moveTo(-z, y));
+  const g = new THREE.ExtrudeGeometry(sh, { depth: L, bevelEnabled: false }); g.rotateY(Math.PI / 2); g.translate(0.3 - L / 2, 0, 0);
+  g.computeVertexNormals();
+  return mesh(g, mats);
+}
 export function buildPlates(M, opts = {}) {
-  const T = opts.t ?? PLATE_T, kind = opts.kind || 'butt';
+  const kind = opts.kind || 'butt';
+  if (kind === 'tee' || kind === 'lap' || (kind === 'butt' && opts.t2 && opts.t2 !== opts.t)) return buildJointPlates(M, opts);
+  const T = opts.t ?? PLATE_T;
   const R = kind === 'single' ? 0.035 : 0;   // cutting plate sits on two steel bars so the kerf is open underneath
   JOINT.t = T; JOINT.y = TABLE_Y + R + T; JOINT.kind = kind;
   const g = new THREE.Group();
@@ -145,6 +154,34 @@ export function buildPlates(M, opts = {}) {
     const line = new THREE.Mesh(new THREE.PlaneGeometry(L - 0.02, 0.0008), new THREE.MeshStandardMaterial({ color: 0x9ea4a9, roughness: 0.95 }));
     line.rotation.x = -Math.PI / 2; line.position.set(0.3, JOINT.y + 0.0002, JOINT.z); g.add(line);
   }
+  return g;
+}
+
+// fit-up exercises: T-joint (fillet), lap joint, and butt joint of two different thicknesses (thick plate tapered 1:4)
+function buildJointPlates(M, o) {
+  const kind = o.kind, t1 = o.t, t2 = o.t2 ?? o.t, L = 0.2, Z = JOINT.z, Y0 = TABLE_Y;
+  const g = new THREE.Group(), mat = M.plate, edge = M.plateEdge;
+  const tackMat = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8 });
+  const tack = (x, y, z, s) => { const t = mesh(new THREE.SphereGeometry(0.0055, 14, 10), tackMat); t.scale.set(1.3, s, s); t.position.set(x, y, z); g.add(t); return t; };
+  if (kind === 'butt') {            // thin plate (z < Z) + thick plate tapered down to the thin thickness at the joint
+    const gap = 0.0016, thin = Math.min(t1, t2), thick = Math.max(t1, t2), taper = (thick - thin) * 4;
+    g.add(profilePlate([[Z - gap / 2 - 0.08, Y0], [Z - gap / 2, Y0], [Z - gap / 2, Y0 + thin], [Z - gap / 2 - 0.08, Y0 + thin]], L, mat));
+    g.add(profilePlate([[Z + gap / 2, Y0], [Z + gap / 2 + 0.08, Y0], [Z + gap / 2 + 0.08, Y0 + thick], [Z + gap / 2 + taper, Y0 + thick], [Z + gap / 2, Y0 + thin]], L, mat));
+    JOINT.t = thin; JOINT.y = Y0 + thin; JOINT.kind = 'butt';
+    [0.205, 0.395].forEach(x => tack(x, JOINT.y + 0.0006, Z, 0.4));
+  } else if (kind === 'tee') {      // base plate t1 on the bench, web t2 standing on it; fillet in the front corner
+    g.add(profilePlate([[Z - 0.06, Y0], [Z + 0.06, Y0], [Z + 0.06, Y0 + t1], [Z - 0.06, Y0 + t1]], L, mat));
+    g.add(profilePlate([[Z - t2, Y0 + t1], [Z, Y0 + t1], [Z, Y0 + t1 + 0.055], [Z - t2, Y0 + t1 + 0.055]], L, mat));
+    JOINT.t = Math.min(t1, t2); JOINT.y = Y0 + t1; JOINT.kind = 'tee';
+    [0.205, 0.395].forEach(x => tack(x, JOINT.y + 0.0022, Z + 0.0022, 0.6));
+  } else {                           // lap: bottom plate t1, top plate t2 overlapping it; fillet along the top plate's edge
+    g.add(profilePlate([[Z - 0.07, Y0], [Z + 0.05, Y0], [Z + 0.05, Y0 + t1], [Z - 0.07, Y0 + t1]], L, mat));
+    g.add(profilePlate([[Z - 0.09, Y0 + t1], [Z, Y0 + t1], [Z, Y0 + t1 + t2], [Z - 0.09, Y0 + t1 + t2]], L, mat));
+    JOINT.t = Math.min(t1, t2); JOINT.y = Y0 + t1; JOINT.kind = 'lap';
+    [0.205, 0.395].forEach(x => tack(x, JOINT.y + 0.0018, Z + 0.0018, 0.5));
+  }
+  g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  void edge;
   return g;
 }
 

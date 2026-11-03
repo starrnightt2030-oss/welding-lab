@@ -106,7 +106,7 @@ export class WeldSim {
   step(input, dt) {
     const p = this.proc; this.time += dt;
     const out = { msg: null };
-    const x = THREE.MathUtils.clamp(input.x, JOINT.x0 - 0.03, JOINT.x1 + 0.01);
+    const x = THREE.MathUtils.clamp(input.x, JOINT.x0 - 0.03, JOINT.x1 + 0.01); this._work = input.work || 0;
     this.trackEvents(x); this.lastInX = x;
     const d = input.dist;
     const sNow = { speed: this.speed, dist: d, angle: input.angle, aux: !!input.aux, settings: this.settings, heat: this.heatAt(x) };
@@ -162,7 +162,7 @@ export class WeldSim {
       if (depositing && x > this.progress - 0.0005) {
         while (this.progress <= Math.min(x, JOINT.x1)) { this.addRipple(this.progress, sNow); this.progress += p.spacing || 0.0011; }
       }
-      this.samples.push({ x, t: this.time, speed: this.speed, dist: d, angle: input.angle, aux: !!input.aux, dep: depositing, heat: this.heatAt(x) });
+      this.samples.push({ x, t: this.time, speed: this.speed, dist: d, angle: input.angle, work: input.work || 0, aux: !!input.aux, dep: depositing, heat: this.heatAt(x) });
 
       const rate = p.sparks ? p.sparks(sNow) : 60;
       this.emitSparks(Math.round(rate * dt + Math.random() * 0.5), x, JOINT.y, p.sparkDir);
@@ -199,7 +199,17 @@ export class WeldSim {
     const dims = p.dims(s);
     const w = dims.w / 1000, h = dims.h / 1000;
     const wob = (Math.random() - 0.5) * 0.0004 * (dims.wobble ?? 1);
-    const r = { x, w, h, z: JOINT.z + wob, born: this.time, s: { speed: s.speed, dist: s.dist, angle: s.angle, aux: s.aux } };
+    let zOff = 0, hk = 1;
+    const ex = this.exercise, g = this.gLocal, id0 = p.ideal;
+    if (ex && g && p.kind !== 'cut' && id0) {
+      // molten metal flows with gravity when the pool is too hot/slow for the position
+      const slow = THREE.MathUtils.clamp(((id0.speed[0] + id0.speed[1]) / 2) / Math.max(0.5, s.speed) - 0.85, 0, 2.5);
+      zOff += g.z * slow * w * 0.35; hk *= 1 + Math.max(0, g.y) * slow * 0.35;
+      if (Math.abs(g.x) > 0.6 && slow > 0.4 && Math.random() < 0.35) this.addRoll(x, JOINT.z, w, h * (1 + slow * 0.4));   // vertical: sagging laps
+      if (g.y > 0.6 && slow > 0.3 && Math.random() < 0.3) this.addRoll(x, JOINT.z + (Math.random() - 0.5) * w * 0.4, w * 0.3, h * 1.6);   // overhead: drops
+    }
+    if (ex && ex.work != null) zOff += Math.sin(THREE.MathUtils.degToRad(this._work || 0)) * w * 0.5;
+    const r = { x, w, h: h * hk, z: JOINT.z + wob + zOff, born: this.time, s: { speed: s.speed, dist: s.dist, angle: s.angle, aux: s.aux } };
     this.ripples.push(r);
     const i = this.ripples.length - 1;
     if (p.kind === 'cut') {
@@ -313,9 +323,9 @@ export class WeldSim {
     let j = 0;
     for (let i = 0; i < this.sparks.length; i++) {
       const s = this.sparks[i]; s.age += dt; if (s.age > s.life) continue;
-      s.v.y -= 9.8 * dt; s.v.multiplyScalar(1 - 0.6 * dt); s.p.addScaledVector(s.v, dt);
+      if (this.gLocal) s.v.addScaledVector(this.gLocal, 9.8 * dt); else s.v.y -= 9.8 * dt; s.v.multiplyScalar(1 - 0.6 * dt); s.p.addScaledVector(s.v, dt);
       if (s.p.y < JOINT.y - 0.006 && s.p.y > floorY - 0.02 && Math.abs(s.p.z - JOINT.z) > 0.09) { /* falling past table edge */ }
-      if (s.p.y < 0.002) { s.p.y = 0.002; s.v.y *= -0.3; s.v.x *= 0.5; s.v.z *= 0.5; }
+      if (!this.gLocal || this.gLocal.y < -0.9) if (s.p.y < 0.002) { s.p.y = 0.002; s.v.y *= -0.3; s.v.x *= 0.5; s.v.z *= 0.5; }
       this.sparks[j++] = s;
     }
     this.sparks.length = j;
@@ -481,7 +491,22 @@ export class WeldSim {
     const defects = p.defects ? p.defects(ctx) : [];
     if (this.craters && this.craters.length && p.kind !== 'cut') defects.push({ name: 'حفرة وشرخ في نهاية الخط', en: 'Crater crack', cause: 'رفعت الأداة فجأة وهي تتحرك ' + AR(this.craters.length) + ' مرة، فبقيت حفرة تنكمش وتتشقق.', fix: 'قبل رفع الأداة توقّف لحظة أو ارجع قليلًا للخلف لملء الحفرة، ثم ارفع.', spots: this.craters.map(x => ({ x0: x - 0.004, x1: x + 0.004 })) });
     if (coverage < 0.95) defects.push({ name: p.kind === 'cut' ? 'قطع غير مكتمل' : 'خط غير مكتمل', en: 'Incomplete', cause: (p.kind === 'cut' ? 'القطع' : 'الخط') + ' لم تغطِّ الطول كله (' + AR(Math.round(coverage * 100)) + '٪).', fix: 'أكمل حتى نهاية الخط.' });
-    defects.forEach(d => { if (!d.spots) d.spots = this.localize(d, bins, coverage); });
+    const ex = this.exercise;
+    if (ex && p.kind !== 'cut') {
+      const slowN = count('slow'), longN = count('long'), P = ex.pos;
+      if ((P === '2G' || P === '2F') && (slowN >= 2 || longN >= 3)) defects.push({ name: 'ترهّل الخط وتآكل الحافة العلوية', en: 'Sagging / top-toe undercut', cause: 'في الوضع الأفقي نزل المعدن المنصهر لأن الحركة بطيئة أو القوس طويل.', fix: 'أمِل الأداة ١٠–١٥° لأعلى، وقصّر القوس، وزِد السرعة قليلًا.', _k: 'slow' });
+      if ((P === '3G' || P === '3F') && slowN >= 2) defects.push({ name: 'تدلّي المعدن في الوضع الرأسي', en: 'Sagging (vertical)', cause: 'تأخرت في الصعود فزادت البركة وتدلّى المعدن إلى أسفل.', fix: 'قلّل التيار ١٠–١٥٪، واصعد بحركة صغيرة منتظمة مع توقف قصير على الحواف.', _k: 'slow' });
+      if ((P === '4G' || P === '4F') && (slowN >= 2 || longN >= 2)) defects.push({ name: 'تساقط المعدن وتحدّب زائد فوق الرأس', en: 'Dripping / excess convexity', cause: 'البركة كبيرة فوق الرأس (قوس طويل أو حركة بطيئة) فسقط جزء من المعدن.', fix: 'قوس قصير جدًا، وحرارة أقل، وحركة سريعة ثابتة.', _k: longN >= 2 ? 'long' : 'slow' });
+      if (ex.work != null) {
+        const wk = S.map(q => q.work || 0), avgW = wk.reduce((a, c) => a + c, 0) / Math.max(1, wk.length), err = avgW - ex.work, all = true;
+        if (err < -7) defects.push({ name: 'حرق وتآكل في اللوح الأرق', en: 'Undercut on thin member', cause: 'وجّهت الحرارة نحو اللوح الأرق (زاوية العمل ' + AR(Math.round(avgW)) + '°)، فذاب طرفه قبل أن ينصهر اللوح الأسمك.', fix: 'وجّه الأداة نحو اللوح الأسمك بزاوية عمل حوالي ' + AR(ex.work) + '°.', all });
+        else if (err > 9) defects.push({ name: 'عدم انصهار عند اللوح الأرق', en: 'Lack of fusion (thin side)', cause: 'ملت بالأداة كثيرًا نحو اللوح الأسمك، فلم تصل الحرارة إلى طرف اللوح الآخر.', fix: 'قلّل الميل إلى حوالي ' + AR(ex.work) + '°، ووزّع الحرارة على اللوحين.', all });
+        else if (ex.work > 0 && err < -3) defects.push({ name: 'انصهار ناقص في اللوح الأسمك', en: 'Insufficient fusion (thick side)', cause: 'اللوح الأسمك يحتاج حرارة أكثر، والأداة لم تمل نحوه بالقدر الكافي.', fix: 'زِد زاوية العمل نحو اللوح الأسمك إلى حوالي ' + AR(ex.work) + '°.', all });
+        const wsc = Math.round(THREE.MathUtils.clamp(100 - Math.abs(err) * 5, 0, 100)); crit.push({ label: 'زاوية العمل', v: wsc }); total = Math.round(total * 0.88 + wsc * 0.12);
+      }
+    }
+    const spanAll = { x0: JOINT.x0 + 0.004, x1: JOINT.x0 + (JOINT.x1 - JOINT.x0) * Math.min(1, coverage) - 0.004, all: true };
+    defects.forEach(d => { if (!d.spots) d.spots = d.all ? [spanAll] : d._k ? this.localize({ en: d._k === 'slow' ? 'Overlap' : 'Spatter' }, bins, coverage) : this.localize(d, bins, coverage); });
     const W = avg(this.ripples.map(r => r.w)) * 1000, H = avg(this.ripples.map(r => r.h)) * 1000;
     const grade = total >= 90 ? 'ممتاز' : total >= 75 ? 'جيد جداً' : total >= 60 ? 'جيد' : total >= 50 ? 'مقبول' : 'يحتاج إلى تدريب';
     return { total, grade, crit, defects, bins, coverage, width: W, height: H, penetration: p.penetration ? p.penetration(this.settings) : 1, avgSpeed: avg(sv), avgDist: avg(dv), kind: p.kind, distName: p.distName, setNote: set.note };

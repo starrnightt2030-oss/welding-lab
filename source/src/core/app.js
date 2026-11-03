@@ -9,6 +9,7 @@ import { ICON } from './icons.js';
 import { Voice } from './voice.js';
 import { runIntro, WELCOME } from '../intro.js';
 import { createCleaning } from './cleaning.js';
+import { createFitup } from './fitup.js';
 import { createAmbience } from '../ambience.js';
 import { HUB, INTRO } from '../voicescript.js';
 import { buildChippingHammer, buildWireBrush } from '../ppe.js';
@@ -21,6 +22,8 @@ const store = {
 
 export function startApp(STATIONS) {
   const viewport = $('#viewport');
+  // every welding station gets a fit-up stage (choose the exercise, clean, tack, mount) before setting up the machine
+  STATIONS.forEach(st => { if (st.stages && st.stages.some(x => x[0] === 'weld') && !st.stages.some(x => x[0] === 'fitup')) { const i = st.stages.findIndex(x => x[0] === 'operate'); st.stages.splice(i >= 0 ? i : st.stages.findIndex(x => x[0] === 'weld'), 0, ['fitup', 'جهّز الوصلة']); } });
   const E = createEngine(viewport);
   const audio = new ArcAudio();
   const intro = runIntro();
@@ -34,7 +37,7 @@ export function startApp(STATIONS) {
     weld: { pressing: false, x: JOINT.x0, dist: 20, aux: false },
     report: null, showDef: false, drawer: true, op: {}, voice: voice.enabled
   };
-  let clean = null, ambience = null, M, sim, plates, hammer, brush, platesOpts = '', booted = false;
+  let clean = null, fitup = null, ambience = null, M, sim, plates, hammer, brush, platesOpts = '', booted = false;
   const shared = {};
 
   const ctx = {
@@ -58,7 +61,9 @@ export function startApp(STATIONS) {
     hammer.userData.pick = 'hammer'; brush.userData.pick = 'brush';
     shared.hammer = hammer; shared.brush = brush;
     setPlates({ t: 0.006, kind: 'butt' });
-    sim = new WeldSim(E.scene);
+    fitup = createFitup({ E, audio, toast: (t, m) => showToast(t, m), say: t => voice.say(t) });
+    fitup.posFrame.add(plates);
+    sim = new WeldSim(E.scene); fitup.jointFrame.add(sim.group);
     clean = createCleaning({ E, audio, sim, hammer, brush, onChange: onClean });
     for (const S of STATIONS) {
       if (!S.ready) continue;
@@ -68,11 +73,13 @@ export function startApp(STATIONS) {
     E.onResize = () => { applyViewOffset(); if (state.stage === 'weld' && !E.tweening()) { const c = weldCamera(); E.camera.position.copy(c.pos); E.controls.target.copy(c.target); } };
   }
   function setPlates(opts) {
+    // the chosen fit-up exercise decides the plates (except the single plate used for cutting)
+    if (fitup && opts.kind !== 'single' && state.station && fitup.st.byStation[state.station]) opts = fitup.plateOpts(state.station);
     const key = JSON.stringify(opts);
     if (key === platesOpts) return;
     platesOpts = key;
     if (plates) { E.scene.remove(plates); plates.traverse(o => o.geometry && o.geometry.dispose()); }
-    plates = buildPlates(M, opts); plates.userData.pick = 'plates'; E.scene.add(plates);
+    plates = buildPlates(M, opts); plates.userData.pick = 'plates'; (fitup ? fitup.posFrame : E.scene).add(plates);
     shared.plates = plates;
   }
 
@@ -84,6 +91,7 @@ export function startApp(STATIONS) {
   function enterStation(id) {
     STATIONS.forEach(s => { if (s.root) s.root.visible = s.id === id; });
     state.station = id; ambience && ambience(id);
+    if (fitup) { fitup.unmount(id, false); fitup.reset(); }
     state.explore = { sel: 0, labels: false, exploded: false };
     state.op = {};
     const s = S();
@@ -125,7 +133,9 @@ export function startApp(STATIONS) {
     E.controls.autoRotate = false;
     E.setHighlight([]);
     state.asm.msg = null;
+    if (fitup && st !== 'weld' && st !== 'operate' && st !== 'fitup' && st !== 'inspect') fitup.unmount(state.station, false);
     if (st === 'explore') { s.setAssembled(true); selectPart(state.explore.sel, false); }
+    if (st === 'fitup') fitupEnter();
     if (st === 'assemble') { state.asm = { step: 0, picked: null, msg: null, busy: false }; s.setAssembled(false); s.asmStart && s.asmStart(ctx); highlightAsm(); }
     if (st === 'operate') { s.setAssembled(true); s.operateEnter && s.operateEnter(ctx); }
     if (st === 'weld') {
@@ -136,7 +146,15 @@ export function startApp(STATIONS) {
       state.weld = { pressing: false, x: JOINT.x0 - 0.02, dist: 25, aux: false, rel: null };
       s.weldEnter && s.weldEnter(ctx);
       setAssist(state.assist);
-      state.prep = { clean: proc.kind === 'cut' ? 1 : 0, done: proc.kind === 'cut' };
+      const fx = fitup.st, isCut = proc.kind === 'cut';
+      if (isCut) fitup.unmount(state.station, false);
+      else if (fx.done) { if (!fx.mounted) fitup.mount(state.station, false); }
+      else { fitup.unmount(state.station, false); }
+      state.prep = { clean: isCut ? 1 : fx.done ? fx.cleaned : 0, done: isCut || fx.done };
+      const ex = isCut ? null : fitup.cur(state.station);
+      sim.gLocal = fitup.gravityLocal(); sim.exercise = fx.done ? ex : null;
+      state.work = 0; state.workIdeal = sim.exercise && sim.exercise.work != null ? sim.exercise.work : null;
+      sim.dirty = Math.max(0, 0.85 - state.prep.clean);
       if (!state.prep.done) clean.start('pre');
     }
     E.poke(st === 'inspect' ? 9000 : 2500);
@@ -152,8 +170,8 @@ export function startApp(STATIONS) {
     if (s.custom && s.custom[st] && s.custom[st].enter) s.custom[st].enter(ctx);
     renderAll();
     E.resize();
-    const cam = st === 'weld' ? (clean.active ? cleanCamera() : weldCamera()) : st === 'inspect' ? (clean.active ? cleanCamera() : inspectCamera()) : s.cams[st]();
-    renderClean(); if (state.showDef) setTimeout(() => state.stage === 'inspect' && showDefects(true), 900);
+    const cam = st === 'weld' ? (clean.active ? cleanCamera() : weldCamera()) : st === 'inspect' ? (clean.active ? cleanCamera() : inspectCamera()) : st === 'fitup' ? fitupCamera() : s.cams[st]();
+    renderClean(); if (st === 'fitup') renderTacks(); if (state.showDef) setTimeout(() => state.stage === 'inspect' && showDefects(true), 900);
     E.flyTo(cam.pos, cam.target, prev === st ? 0.01 : prev === 'hub' || !prev ? 2.2 : 1.2);
     const intro = INTRO[s.id] && INTRO[s.id][st];
     if (st === 'assemble') voice.say((intro ? intro + ' ' : '') + stepSpeech());
@@ -170,12 +188,58 @@ export function startApp(STATIONS) {
   }
   function renderAll() { renderTopbar(); renderPanel(); renderHotspots(); renderHUD(); applyViewOffset(); }
 
-  function weldCamera() {
+  function weldCamera() { const c = weldCameraLocal(); if (fitup) { fitup.posFrame.updateMatrixWorld(true); const m = fitup.posFrame.matrixWorld; c.pos.applyMatrix4(m); c.target.applyMatrix4(m); } return c; }
+  function weldCameraLocal() {
     const aspect = viewport.clientWidth / Math.max(1, viewport.clientHeight);
     const vf = THREE.MathUtils.degToRad(E.camera.fov), hf = 2 * Math.atan(Math.tan(vf / 2) * aspect);
     const dist = Math.max(0.22, (0.25 / 2) / Math.tan(hf / 2));
     const t = V3(0.3, JOINT.y, JOINT.z - 0.004);
     return { pos: t.clone().addScaledVector(V3(0, 0.62, 0.78).normalize(), dist), target: t };
+  }
+  // ---------------------------------------------------------------- fit-up stage
+  function fitupCamera() { return { pos: V3(0.36, JOINT.y + 0.33, JOINT.z + 0.36), target: V3(0.3, JOINT.y + 0.01, JOINT.z) }; }
+  function fitupEnter() {
+    const sid = state.station, s = S();
+    if (!fitup.st.byStation[sid]) fitup.select(sid, fitup.list(sid)[0].id);
+    fitup.unmount(sid, false); setPlates({ kind: 'butt' }); fitup.apply(fitup.cur(sid), 0);
+    s.onExercise && s.onExercise(fitup.cur(sid), ctx);
+    renderTacks();
+  }
+  function isCutTask() { const s = S(); return s.id === 'oaw' && s.weldSettings && s.weldSettings(ctx).task === 'cut'; }
+  function fitupHTML() {
+    const sid = state.station, fx = fitup.st, ex = fitup.cur(sid);
+    if (isCutTask()) return `<section class="card"><h3 class="sm">القطع لا يحتاج تجهيز وصلة</h3><p class="muted small">في القطع نستخدم لوحًا واحدًا عليه خط القطع. اختر «لحام» في مرحلة الضبط لتجهيز وصلة.</p></section><button type="button" class="btn primary big" data-go="operate" data-mark="fitup">التالي ${ICON.next}</button>`;
+    const steps = [[!!fx.cleanDone, 'نظّف حواف الوصلة بالفرشاة'], [fx.tacks.every(Boolean), 'ثبّت القطع بنقاط تكميل'], [fx.mounted, 'ثبّت القطعة في وضع اللحام']];
+    const next = steps.findIndex(x => !x[0]);
+    return `<section class="card"><h3 class="sm">اختر التمرين</h3><div class="ex-list">${fitup.list(sid).map(e => `<button type="button" class="ex ${e.id === ex.id ? 'on' : ''}" data-act="ex:${e.id}"><b>${e.name}</b><span>${e.ship}</span><i>${fitup.JOINT_NAME[e.kind]} • ${e.t === e.t2 ? e.t + ' مم' : e.t + ' + ' + e.t2 + ' مم'} • ${fitup.POS[e.pos].name}</i></button>`).join('')}</div></section>
+      <section class="card"><h3 class="sm">خطوات التجهيز</h3><ol class="steps">${steps.map(([ok, t], i) => `<li class="${ok ? 'done' : i === next ? 'cur' : ''}"><i>${ok ? ICON.check : AR(i + 1)}</i><span>${t}</span></li>`).join('')}</ol>
+        ${next === 0 ? `<button type="button" class="btn primary" data-act="fit-clean">${ICON.hand}ابدأ التنظيف بالفرشاة</button>` : next === 1 ? '<p class="muted small">المس الدوائر الثلاث على الوصلة: الطرفان ثم المنتصف.</p>' : next === 2 ? `<button type="button" class="btn primary" data-act="fit-mount">${ICON.target}ثبّت في وضع ${fitup.POS[ex.pos].name}</button>` : ''}
+        <p class="small">${fitup.POS_TIP[ex.pos]}${ex.work != null && ex.work > 0 ? ' وجّه الأداة نحو اللوح الأسمك بزاوية عمل حوالي ' + AR(ex.work) + '° حتى تنصهر حافتاه بالتساوي.' : ''}</p></section>
+      <button type="button" class="btn primary big" data-go="operate" data-mark="fitup" ${fx.mounted ? '' : 'disabled'}>التالي: اضبط الماكينة ${ICON.next}</button>`;
+  }
+  const tackLayer = $('#hotspots');
+  function renderTacks() {
+    [...document.querySelectorAll('.tackpt')].forEach(b => b.remove());
+    if (state.stage !== 'fitup' || isCutTask() || !fitup.st.cleanDone || fitup.st.tacks.every(Boolean)) return;
+    [JOINT.x0 + 0.006, JOINT.x1 - 0.006, (JOINT.x0 + JOINT.x1) / 2].forEach((x, i) => {
+      if (fitup.st.tacks[i]) return;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'tackpt'; b.dataset.act = 'tack:' + i; b.setAttribute('aria-label', 'نقطة تكميل ' + (i + 1)); b._x = x; tackLayer.appendChild(b);
+    });
+  }
+  function updateTacks() {
+    const els = document.querySelectorAll('.tackpt'); if (!els.length) return;
+    const w = viewport.clientWidth, h = viewport.clientHeight;
+    els.forEach(b => { _dp.set(b._x, JOINT.y + 0.002, JOINT.z + 0.002); _dp.project(E.camera); b.style.transform = `translate(${(_dp.x * 0.5 + 0.5) * w}px, ${(-_dp.y * 0.5 + 0.5) * h}px)`; });
+  }
+  function doTack(i) {
+    const fx = fitup.st; if (fx.tacks[i]) return;
+    fx.tacks[i] = true; audio.sfx('pop'); audio.sfx('chip');
+    const t = new THREE.Mesh(new THREE.SphereGeometry(0.005, 14, 10), new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8, emissive: 0xff7a1a, emissiveIntensity: 2 }));
+    const x = [JOINT.x0 + 0.006, JOINT.x1 - 0.006, (JOINT.x0 + JOINT.x1) / 2][i];
+    t.scale.set(1.3, 0.45, 0.9); t.position.set(x, JOINT.y + 0.0012, JOINT.z + (JOINT.kind === 'butt' ? 0 : 0.002)); plates.add(t);
+    E.tween(1.4, k => { t.material.emissiveIntensity = 2 * (1 - k); });
+    renderTacks(); renderPanel();
+    if (fx.tacks.every(Boolean)) { showToast('good', 'تم تثبيت القطع بثلاث نقاط تكميل. الآن ثبّتها في وضع اللحام.'); }
   }
   function cleanCamera() { return { pos: V3(0.3, JOINT.y + 0.27, JOINT.z + 0.17), target: V3(0.3, JOINT.y, JOINT.z) }; }
   // ---- hands-on cleaning (wire brush before welding, chipping hammer + brush after)
@@ -193,6 +257,11 @@ export function startApp(STATIONS) {
   }
   function onClean(e) {
     if (e.prog != null && !e.done) { const b = document.querySelector('#clean-ui .bar i'); if (b) b.style.width = Math.round(e.prog * 100) + '%'; return; }
+    if (e.done === 'pre' && state.stage === 'fitup') {
+      fitup.st.cleaned = clean.cleanFrac(); fitup.st.cleanDone = true;
+      if (fitup.st.cleaned < 0.8) { showToast('bad', 'لم تُنظَّف الحواف جيدًا؛ قد تظهر مسامية في الخط.'); renderPanel(); renderTacks(); renderClean(); return; }
+      showToast('good', 'الحواف نظيفة. الآن ثبّت القطع بنقاط تكميل.'); const c = fitupCamera(); E.flyTo(c.pos, c.target, 0.8); renderPanel(); renderTacks(); renderClean(); return;
+    }
     if (e.done === 'pre') {
       state.prep = { clean: clean.cleanFrac(), done: true }; sim.dirty = Math.max(0, 0.85 - state.prep.clean);
       showToast(state.prep.clean > 0.8 ? 'good' : 'bad', state.prep.clean > 0.8 ? 'ممتاز، أصبح سطح الوصلة نظيفًا. الآن ابدأ اللحام.' : 'لم يُنظَّف السطح جيدًا؛ قد تظهر مسامية في الخط.');
@@ -427,13 +496,29 @@ export function startApp(STATIONS) {
     } else {
       plane.constant = -JOINT.y;
       E.setRay(ev);
-      if (!E.ray.ray.intersectPlane(plane, hit)) return;
+      const ray = E.ray.ray.clone(); if (fitup) ray.applyMatrix4(fitup.W().clone().invert());
+      if (!ray.intersectPlane(plane, hit)) return;
       w.x = hit.x;
       w.dist = Math.max(0, (JOINT.z - hit.z) * 1000 * k);
     }
     w.pressing = true;
   }
   let tipPos = new THREE.Vector3();
+  // ---- tools follow the work frame (positions + fillet joints) and the work angle (tilt around the joint axis)
+  const _snap = new Map(), _qW = new THREE.Quaternion(), _qa = new THREE.Quaternion(), _ax = new THREE.Vector3(1, 0, 0);
+  const isIdentity = m => { const e = m.elements; return Math.abs(e[0] - 1) + Math.abs(e[5] - 1) + Math.abs(e[10] - 1) + Math.abs(e[12]) + Math.abs(e[13]) + Math.abs(e[14]) + Math.abs(e[1]) + Math.abs(e[2]) + Math.abs(e[4]) < 1e-6; };
+  function snapTools(s) { _snap.clear(); s.root.children.forEach(o => _snap.set(o, [o.position.clone(), o.quaternion.clone()])); }
+  let _fk = 0;
+  function frameTools(s, W) {
+    _qW.setFromRotationMatrix(W); _qa.setFromAxisAngle(_ax, -THREE.MathUtils.degToRad(state.work || 0));
+    const pivot = V3(tipPos.x, JOINT.y, JOINT.z);
+    s.root.children.forEach(o => {
+      const p = _snap.get(o); if (!p || (p[0].equals(o.position) && p[1].equals(o.quaternion))) return;
+      if (state.work) { o.position.sub(pivot).applyQuaternion(_qa).add(pivot); o.quaternion.premultiply(_qa); }
+      o.position.applyMatrix4(W); o.quaternion.premultiply(_qW);
+    });
+    if ((_fk++ & 1) === 0 && s.afterMove) s.afterMove(ctx);
+  }
   const LEVELS = { beg: 'مبتدئ', mid: 'متوسط', adv: 'متقدم' };
   const LEVEL_TIP = {
     beg: 'المستوى المبتدئ: الأداة تتحرك وحدها بالسرعة الصحيحة، وتتحكم أنت في المسافة فقط.',
@@ -469,12 +554,16 @@ export function startApp(STATIONS) {
       if (pr.aux && !w.auxHeld) w.aux = pr.kind === 'cut' ? heatOK : Math.sin(sim.time * 5.5) > 0.35;
     } else if (!w.pressing) w.autoX = null;
     if (state.level === 'mid' && w.pressing && sim.proc.fillerLen && !w.auxHeld) w.aux = Math.sin(sim.time * 5.5) > 0.35;
-    const out = sim.step({ pressing: w.pressing, x: w.x, dist: d, angle: state.angle, aux: w.aux }, dt);
+    if (state.workIdeal != null && state.level === 'beg') state.work = state.workIdeal;
+    const out = sim.step({ pressing: w.pressing, x: w.x, dist: d, angle: state.angle, aux: w.aux, work: state.work || 0 }, dt);
     if (out.msg) showToast(out.msg.t, out.msg.s);
     const target = V3(w.x, JOINT.y + (w.pressing && !sim.stuck ? Math.max(0.0003, d / 1000) : w.pressing ? 0.0002 : 0.025), JOINT.z);
     if (!w.pressing && state.control === 'rel') target.x = Math.max(JOINT.x0 - 0.01, Math.min(sim.progress, JOINT.x1));
     tipPos.lerp(target, 1 - Math.pow(0.0004, dt));
+    const W = fitup.W(), moved = !isIdentity(W) || state.work;
+    if (moved) snapTools(s);
     s.weldPose(ctx, tipPos, dt, out);
+    if (moved) frameTools(s, W);
     audio.update(sim.on, d / mid, sim.proc.kind === 'cut' && w.aux ? 'cut' : sim.proc.sound);
     const lensOn = state.lens && sim.on && sim.proc.lens !== false;
     $('#lens').classList.toggle('on', lensOn);
@@ -526,7 +615,8 @@ export function startApp(STATIONS) {
     if (R) {
       if (!w.pressing) { w.x = Math.max(JOINT.x0, Math.min(sim.progress, JOINT.x1)); }
       w.pressing = true; w.dist = R.y * stickRange().max;
-      if (p.angle !== false && state.level === 'adv') { state.angle = Math.round(40 + R.x * 50); const av = $('#angle-v'); if (av) av.textContent = state.angle + '°'; const a = $('#angle'); if (a) a.value = state.angle; }
+      if (state.workIdeal != null && state.level !== 'beg') { state.work = Math.round((R.x - 0.5) * 60); const wv = $('#work-v'); if (wv) wv.textContent = state.work + '°'; const wi = $('#work'); if (wi) wi.value = state.work; }
+      else if (p.angle !== false && state.level === 'adv') { state.angle = Math.round(40 + R.x * 50); const av = $('#angle-v'); if (av) av.textContent = state.angle + '°'; const a = $('#angle'); if (a) a.value = state.angle; }
     }
     if (L && w.pressing && state.level !== 'beg') { const v = (L.x - 0.5) * 2, vmax = p.ideal.speed[1] * 1.9; w.x = THREE.MathUtils.clamp(w.x + (Math.abs(v) < 0.06 ? 0 : v) * vmax / 1000 * dt, JOINT.x0 - 0.02, JOINT.x1 + 0.01); }
   }
@@ -547,7 +637,7 @@ export function startApp(STATIONS) {
       assist.rotation.x = -Math.PI / 2;
       const ring = new THREE.Mesh(new THREE.RingGeometry(0.0035, 0.0052, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.1, 0.3), toneMapped: false, depthWrite: false, transparent: true }));
       ring.rotation.x = -Math.PI / 2; assist.userData.ring = ring;
-      E.scene.add(assist, ring);
+      (fitup ? fitup.jointFrame : E.scene).add(assist, ring);
     }
     const ideal = ((proc.ideal.dist[0] + proc.ideal.dist[1]) / 2) / (proc.distPerMM ?? 0.42) / 1000;
     const band = ((proc.ideal.dist[1] - proc.ideal.dist[0]) / (proc.distPerMM ?? 0.42)) / 1000;
@@ -563,7 +653,7 @@ export function startApp(STATIONS) {
   let defectGroup; const DCOL = [0xff4d4d, 0xffb020, 0x4da3ff, 0xc77dff, 0x3ddc97, 0xff7ab8, 0x00d1c1];
   const defLayer = $('#defmarks'), _dp = new THREE.Vector3();
   function showDefects(on) {
-    if (defectGroup) { E.scene.remove(defectGroup); defectGroup = null; }
+    if (defectGroup) { defectGroup.parent && defectGroup.parent.remove(defectGroup); defectGroup = null; }
     defLayer.innerHTML = ''; const card = $('#defcard'); if (card) card.hidden = true;
     if (!on || !state.report || !state.report.defects) return;
     defectGroup = new THREE.Group();
@@ -581,14 +671,14 @@ export function startApp(STATIONS) {
       b._pos = { x: sp.all ? JOINT.x0 + 0.015 + i * 0.022 : (sp.x0 + sp.x1) / 2, y: JOINT.y + h * 1.6, z: JOINT.z + 0.011 + (i % 3) * 0.0035 };
       defLayer.appendChild(b);
     }));
-    E.scene.add(defectGroup);
+    (fitup ? fitup.jointFrame : E.scene).add(defectGroup);
     updateDefMarks();
   }
   function updateDefMarks() {
     if (!defLayer.children.length) return;
     const w = viewport.clientWidth, hh = viewport.clientHeight;
     [...defLayer.children].forEach((b, k) => {
-      _dp.set(b._pos.x, b._pos.y, b._pos.z).project(E.camera);
+      _dp.set(b._pos.x, b._pos.y, b._pos.z); if (fitup) _dp.applyMatrix4(fitup.W()); _dp.project(E.camera);
       const vis = _dp.z < 1 && Math.abs(_dp.x) < 1.05 && Math.abs(_dp.y) < 1.05;
       b.style.display = vis ? '' : 'none';
       b.style.transform = `translate(${(_dp.x * 0.5 + 0.5) * w}px, ${(-_dp.y * 0.5 + 0.5) * hh + 34 + (k % 3) * 30}px)`;
@@ -728,6 +818,7 @@ export function startApp(STATIONS) {
     else if (st === 'explore') html = exploreHTML();
     else if (st === 'assemble') html = assembleHTML();
     else if (st === 'operate') html = operateHTML();
+    else if (st === 'fitup') html = fitupHTML();
     else if (st === 'inspect') html = inspectHTML();
     const sc = panel.scrollTop; panel.innerHTML = html; panel.scrollTop = sc;
     $('#drawer-title').textContent = st === 'hub' ? 'المحطات' : (s && s.stages.find(x => x[0] === st) || [, ''])[1];
@@ -741,6 +832,7 @@ export function startApp(STATIONS) {
     const gauges = s.hud(ctx);
     hud.innerHTML = `
       <div class="gauges">${gauges.map(g => `<div class="g" id="g-${g.id}"><span class="l">${g.label}</span><b class="mono v">--</b>${g.bar === false ? '' : '<div class="m" dir="ltr"><i class="z"></i><i class="n"></i></div>'}<small class="mono t">${g.hint || ''}</small></div>`).join('')}</div>
+      ${state.workIdeal != null && state.level !== 'beg' ? `<div class="work-ctl glass"><label for="work">زاوية العمل <small>${state.workIdeal > 0 ? '(نحو اللوح الأسمك ≈ ' + AR(state.workIdeal) + '°)' : '(على منتصف الزاوية)'}</small></label><div class="wk"><input id="work" type="range" min="-30" max="30" value="${state.work || 0}" aria-label="زاوية العمل"><i class="ideal" style="left:${((state.workIdeal + 30) / 60 * 100).toFixed(1)}%"></i></div><b class="mono" id="work-v">${state.work || 0}°</b></div>` : ''}
       ${proc.angle !== false ? `<div class="angle-ctl"><label for="angle">${proc.angleShort || 'الزاوية'}</label><input id="angle" type="range" min="30" max="90" value="${state.angle}" aria-label="${proc.angleName || 'زاوية الميل'}"><b class="mono" id="angle-v">${state.angle}°</b></div>` : ''}
       <div class="weld-tools">
         ${proc.lens !== false ? `<button type="button" class="btn ${state.lens ? 'on-green' : ''}" data-act="lens">${ICON.lens}<span>${proc.lensName || 'الماسك'}</span></button>` : ''}
@@ -753,7 +845,7 @@ export function startApp(STATIONS) {
       ${state.padEdit ? `<div class="pad-bar glass"><b>اسحب لوحات التحكم إلى المكان المريح ليديك</b><span>الحجم</span>${[0.85, 1, 1.25, 1.5].map(z => `<button type="button" class="${+store.get('padScale', 1) === z ? 'on' : ''}" data-act="pad-size:${z}">${z === 0.85 ? 'صغير' : z === 1 ? 'عادي' : z === 1.25 ? 'كبير' : 'كبير جدًا'}</button>`).join('')}<button type="button" data-act="pad-reset">الأماكن الأصلية</button><button type="button" class="primary" data-act="pad-edit">تم</button></div>` : ''}
       ${state.control === 'sticks' ? `<div class="sticks">
         ${state.level !== 'beg' ? `<div id="stick-l" class="stick h"><span class="cap">الحركة على الخط</span><i class="rail"></i><b class="knob"></b><small class="lr"><span>رجوع</span><span>تقدّم</span></small></div>` : `<div class="stick-note">المستوى المبتدئ: الأداة تتحرك وحدها بالسرعة الصحيحة.<br>تحكّم أنت في ${proc.distName}.</div>`}
-        <div id="stick-r" class="stick xy"><span class="cap">${proc.distName}${proc.angle !== false && state.level === 'adv' ? ' + الزاوية' : ''}</span><i class="zone" style="bottom:${(proc.ideal.dist[0] / stickRange().max * 100).toFixed(1)}%;height:${((proc.ideal.dist[1] - proc.ideal.dist[0]) / stickRange().max * 100).toFixed(1)}%"></i><b class="knob"></b><small>المس لتبدأ • أعلى = أبعد</small></div>
+        <div id="stick-r" class="stick xy"><span class="cap">${proc.distName}${state.workIdeal != null && state.level !== 'beg' ? ' + زاوية العمل' : proc.angle !== false && state.level === 'adv' ? ' + الزاوية' : ''}</span><i class="zone" style="bottom:${(proc.ideal.dist[0] / stickRange().max * 100).toFixed(1)}%;height:${((proc.ideal.dist[1] - proc.ideal.dist[0]) / stickRange().max * 100).toFixed(1)}%"></i><b class="knob"></b><small>المس لتبدأ • أعلى = أبعد</small></div>
       </div>` : ''}
       ${proc.aux && !(state.level === 'beg') && !(state.level === 'mid' && proc.fillerLen) ? `<button type="button" class="aux-btn ${state.control === 'sticks' ? 'near-l' : ''}" id="aux-btn">${proc.aux.icon || ICON.plus}<span>${proc.aux.label}</span><small>${proc.aux.hint || 'اضغط واستمر'}</small></button>` : ''}
       <div class="weld-bottom">
@@ -763,6 +855,8 @@ export function startApp(STATIONS) {
       </div>`;
     const a = $('#angle');
     if (a) a.addEventListener('input', () => { state.angle = +a.value; $('#angle-v').textContent = state.angle + '°'; });
+    const wk = $('#work');
+    if (wk) wk.addEventListener('input', () => { state.work = +wk.value; $('#work-v').textContent = state.work + '°'; });
     const ab = $('#aux-btn');
     if (ab) {
       const on = e => { e.preventDefault(); state.weld.aux = true; state.weld.auxHeld = true; ab.classList.add('on'); audio.ensure(); };
@@ -817,7 +911,8 @@ export function startApp(STATIONS) {
     const s = S(), at = store.get('attempts.' + s.id, []), d = new Date();
     at.push({ total: state.report.total, when: d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) });
     store.set('attempts.' + s.id, at.slice(-30));
-    goStage('inspect');
+    if (fitup.st.mounted) { state.weld.pressing = false; fitup.unmount(state.station, true, () => goStage('inspect')); showToast('info', 'فكّ القطعة من الحامل وضعها على الطاولة للفحص.'); }
+    else goStage('inspect');
   }
 
   // ---------------------------------------------------------------- events
@@ -849,6 +944,10 @@ export function startApp(STATIONS) {
     else if (a === 'finish') finishWeld();
     else if (a === 'slag') { if (sim.startSlagRemoval()) { showToast('info', 'جارٍ تكسير الخبث بالمطرقة…'); [0, 180, 360, 540, 720, 900].forEach(d => setTimeout(() => audio.sfx('chip'), d)); } }
     else if (a === 'clean-skip') { clean.skip(); }
+    else if (a && a.startsWith('ex:')) { fitup.select(state.station, a.slice(3)); platesOpts = ''; setPlates({ kind: 'butt' }); fitup.apply(fitup.cur(state.station), 0); s.onExercise && s.onExercise(fitup.cur(state.station), ctx); const c = fitupCamera(); E.flyTo(c.pos, c.target, 0.8); renderPanel(); renderTacks(); }
+    else if (a === 'fit-clean') { clean.start('pre'); renderClean(); const c = cleanCamera(); E.flyTo(c.pos, c.target, 0.8); }
+    else if (a && a.startsWith('tack:')) doTack(+a.slice(5));
+    else if (a === 'fit-mount') { fitup.mount(state.station, true, () => { fitup.st.done = true; renderPanel(); showToast('good', 'القطعة مثبتة في وضع ' + fitup.POS[fitup.cur(state.station).pos].name + '. اضبط الماكينة ثم ابدأ اللحام.'); const c = weldCamera(); E.flyTo(c.pos.clone().lerp(c.target, -0.6), c.target, 1.0); }); }
     else if (a === 'def-focus') { focusDefect(+el.dataset.i, +(el.dataset.j || 0)); }
     else if (a === 'def-close') { $('#defcard').hidden = true; }
     else if (a === 'defects') { state.showDef = !state.showDef; showDefects(state.showDef); renderPanel(); }
@@ -893,7 +992,7 @@ export function startApp(STATIONS) {
     if (state.stage === 'weld') weldFrame(dt);
     else if (sim) { sim.time += dt; if (state.stage === 'inspect') sim.updateSlag(dt); sim.updateRipples(); sim.updateSparks(dt); sim.updateSmoke(dt); }
     s && s.frame && s.frame(ctx, dt);
-    updateHotspots(); updateDefMarks();
+    updateHotspots(); updateDefMarks(); updateTacks();
   });
 
   (async function boot() {
