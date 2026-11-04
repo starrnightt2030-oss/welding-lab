@@ -636,7 +636,7 @@ function orientTorch(dirWorld, cut) {
   const dl = torchTipDir(cut);
   const ul = V3(-1, 0, 0); ul.sub(dl.clone().multiplyScalar(ul.dot(dl))).normalize();
   const dw = dirWorld.clone().normalize();
-  const uw = cut ? V3(-0.25, 0.42, -0.87) : V3(-0.75, 0.55, 0.2); uw.sub(dw.clone().multiplyScalar(uw.dot(dw))).normalize();
+  const uw = cut ? V3(0.15, 0.45, -0.88) : V3(-0.75, 0.55, 0.2); uw.sub(dw.clone().multiplyScalar(uw.dot(dw))).normalize();
   _m1.makeBasis(dl, ul, dl.clone().cross(ul)); _m2.makeBasis(dw, uw, dw.clone().cross(uw));
   _m2.multiply(_m1.transpose());
   torch.quaternion.setFromRotationMatrix(_m2);

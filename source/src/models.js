@@ -404,8 +404,12 @@ export class Cable {
     p.push(a.clone().addScaledVector(da, 0.06));
     const aDrop = a.clone().addScaledVector(da, 0.16); aDrop.y = Math.max(floorY, a.y * 0.35);
     p.push(aDrop);
-    const fa = a.clone().addScaledVector(da, 0.26); fa.y = floorY; p.push(fa);
+    const fa = a.clone().addScaledVector(da, 0.26); fa.y = floorY;
+    if (a.x < -0.25) { aDrop.x = Math.min(aDrop.x, -0.28); fa.x = Math.min(fa.x, -0.28); }   // from the cylinders: drop to the floor beside the bench, not through its shelf
+    p.push(fa);
     if (opts.via) opts.via.forEach(v => p.push(v.clone()));
+    // coming from the cylinders (left of the bench) to the front of the bench: pass in FRONT of the front-left leg, not through it
+    if (fa.x < -0.19 && (b.x > -0.19) && fa.z < 0.45) p.push(new THREE.Vector3(-0.2, floorY, 0.46));
     const side = opts.bSide || (b.y > 0.3 ? 'table' : 'floor');
     if (side === 'table') {
       // end is on the table: rise over the front edge
@@ -421,7 +425,10 @@ export class Cable {
       const mid = b.clone().addScaledVector(db, 0.12); mid.y = Math.max(mid.y - 0.05, TABLE_Y + 0.05); mid.z = Math.max(mid.z, 0.2);
       const fb = new THREE.Vector3(b.x + 0.1, floorY, 0.62);
       const hang = new THREE.Vector3(b.x + 0.12, TABLE_Y * 0.7, 0.42);
-      p.push(fb, hang, mid);
+      // go OVER the front edge of the table top (never through it) on the way up to the torch
+      const edgeZ = opts.edgeZ ?? 0.31, over = new THREE.Vector3(b.x + 0.1, TABLE_Y + this.radius + 0.012, edgeZ + 0.03);
+      const lip = new THREE.Vector3(b.x + 0.08, TABLE_Y + this.radius + 0.004, edgeZ - 0.01);
+      if (mid.z < edgeZ + 0.02) p.push(fb, hang, over, lip, mid); else p.push(fb, hang, mid);
     } else if (side === 'hang') {
       // end clamped at table edge, cable drops down beside the table
       const fb = new THREE.Vector3(b.x + 0.12, floorY, b.z + 0.3); p.push(fb);
@@ -434,7 +441,11 @@ export class Cable {
     const rough = new THREE.CatmullRomCurve3(p, false, 'centripetal', 0.5);
     // sample densely and keep every point resting on (never under) the floor
     const pts = rough.getSpacedPoints(120);
-    for (const q of pts) if (q.y < floorY) q.y = floorY;
+    for (const q of pts) {
+      if (q.y < floorY) q.y = floorY;
+      // never inside the bench top: lift any point that falls within its footprint and thickness
+      if (q.x > -0.25 && q.x < 0.85 && q.z > -0.31 && q.z < 0.31 && q.y < TABLE_Y + this.radius + 0.002 && q.y > TABLE_Y - 0.05) q.y = TABLE_Y + this.radius + 0.002;
+    }
     const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.2);
     this.mesh.geometry.dispose();
     this.mesh.geometry = new THREE.TubeGeometry(curve, 160, this.radius, 10, false);

@@ -77,7 +77,7 @@ export class WeldSim {
   configure(proc, settings) { this.proc = proc; this.settings = settings; this.reset(); }
 
   reset() {
-    this._sag = 0; this.wPh = 0; this.weaveZ = 0; this.weaveA = 0.0025; this.weave = this.weave || 'none';
+    this._sag = 0; this.cutting = false; this.wPh = 0; this.weaveZ = 0; this.weaveA = 0.0025; this.weave = this.weave || 'none';
     const p = this.proc;
     this.ripples = []; this.samples = [];
     this.events = { stuck: 0, outs: 0, strikes: 0, lost: 0, early: 0 };
@@ -154,6 +154,9 @@ export class WeldSim {
     if (this.on) {
       // heat input at the torch
       this.addHeat(x, (p.heatRate ? p.heatRate(sNow) : 1) * dt);
+      // oxygen cutting is self-sustaining: once the cut has started, the burning iron (exothermic) keeps the front
+      // at ignition temperature, so the torch can travel at the real cutting speed instead of re-preheating every mm
+      if (p.kind === 'cut' && input.aux && this.cutting) { this.addHeat(x + 0.002, 3.4 * dt); this.addHeat(x + 0.005, 1.6 * dt); }
       if (p.consumable) {
         this.consumable = Math.max(p.consumable.min, this.consumable - p.consumable.rate(this.settings) * dt);
         if (this.consumable <= p.consumable.min) { this.on = false; this.setVisible(false); out.msg = { t: 'info', s: p.consumable.outMsg }; out.consumableOut = true; }
@@ -166,6 +169,7 @@ export class WeldSim {
         if (input.aux && !heatOK) { if (!this.earlyFlag) { this.events.early++; this.earlyFlag = true; out.msg = { t: 'bad', s: 'لم يصل الحديد إلى اللون الأحمر بعد. سخّن أولًا، ثم افتح أكسجين القطع.' }; } }
         if (!input.aux) this.earlyFlag = false;
         depositing = heatOK && input.aux;
+        this.cutting = depositing || (this.cutting && input.aux && this.heatAt(x) > p.heatNeed * 0.55);
         if (depositing && this.speed > p.ideal.speed[1] * 1.8) { depositing = false; if (!this.lostFlag) { this.events.lost++; this.lostFlag = true; out.msg = { t: 'bad', s: 'توقف القطع! السرعة عالية جدًا والحرارة غير كافية. ارجع إلى آخر نقطة وسخّن مرة أخرى.' }; } }
         else this.lostFlag = false;
       } else if (p.heatNeed && !heatOK) {

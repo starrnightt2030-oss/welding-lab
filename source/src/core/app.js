@@ -223,7 +223,8 @@ export function startApp(STATIONS) {
     const n = new THREE.Vector3(0, 1, 0).transformDirection(W);   // outward normal of the joint (bisector for fillets)
     c.target.applyMatrix4(W);
     let dir;
-    if (n.y > 0.7) dir = new THREE.Vector3(0, 0.62, 0.78).transformDirection(fitup.posFrame.matrixWorld);   // flat: as before
+    if (sim && sim.proc && sim.proc.kind === 'cut') dir = V3(-0.42, 0.62, 0.66);   // cutting: from the left-front, looking along the kerf towards the torch (the torch head never hides the cut)
+    else if (n.y > 0.7) dir = new THREE.Vector3(0, 0.62, 0.78).transformDirection(fitup.posFrame.matrixWorld);   // flat: as before
     else {   // look INTO the joint along its open side, from the trainee's side; a little above unless the joint faces down
       dir = n.clone().multiplyScalar(0.8).add(V3(0, n.y > -0.3 ? 0.28 : 0, 0.55));
       if (dir.clone().normalize().dot(n) < 0.55) dir.lerp(n, 0.5);
@@ -1236,6 +1237,7 @@ export function startApp(STATIONS) {
 
   if (/[?&]debug/.test(location.search)) window.__wl = {
     state, ctx, JOINT, fitup: () => fitup, weldCamera: () => weldCamera(), goStage, enterStation, goHub, finishWeld, E, sim: () => sim, S, voice, spoken: (() => { const a = []; const o = voice.say.bind(voice); voice.say = (t, p) => { a.push(t); return o(t, p); }; return a; })(),
+    frame: dt => weldFrame(dt),
     simulate(secs = 50, opts = {}) {
       const dt = 1 / 60, proc = sim.proc; let x = JOINT.x0;
       const sp = opts.speed ?? (proc.ideal.speed[0] + proc.ideal.speed[1]) / 2, dd = opts.dist ?? (proc.ideal.dist[0] + proc.ideal.dist[1]) / 2;
