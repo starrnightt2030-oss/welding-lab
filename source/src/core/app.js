@@ -1,7 +1,7 @@
 // App controller: stations, stages, panels, weld input. Station modules plug in through a common interface.
 import * as THREE from 'three';
 import { createEngine, V3, ease } from './engine.js';
-import { WeldSim } from './weldsim.js';
+import { WeldSim, WEAVE } from './weldsim.js';
 import { makeMaterials, buildRoom, buildTable, buildPlates, TABLE_Y, JOINT } from '../models.js';
 import { ArcAudio } from '../audio.js';
 import { AR } from '../data.js';
@@ -13,6 +13,7 @@ import { createFitup } from './fitup.js';
 import { createAmbience } from '../ambience.js';
 import { HUB, INTRO } from '../voicescript.js';
 import { buildChippingHammer, buildWireBrush } from '../ppe.js';
+import { Textures } from '../textures.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const store = {
@@ -22,8 +23,8 @@ const store = {
 
 export function startApp(STATIONS) {
   const viewport = $('#viewport');
-  // every welding station gets a fit-up stage (choose the exercise, clean, tack, mount) before setting up the machine
-  STATIONS.forEach(st => { if (st.stages && st.stages.some(x => x[0] === 'weld') && !st.stages.some(x => x[0] === 'fitup')) { const i = st.stages.findIndex(x => x[0] === 'operate'); st.stages.splice(i >= 0 ? i : st.stages.findIndex(x => x[0] === 'weld'), 0, ['fitup', 'جهّز الوصلة']); } });
+  // every welding station gets a fit-up stage (choose the exercise, clean, tack with the machine, mount) after the machine is set up
+  STATIONS.forEach(st => { if (st.stages && st.stages.some(x => x[0] === 'weld') && !st.stages.some(x => x[0] === 'fitup')) { st.stages.splice(st.stages.findIndex(x => x[0] === 'weld'), 0, ['fitup', 'جهّز الوصلة']); } });
   const E = createEngine(viewport);
   const audio = new ArcAudio();
   const intro = runIntro();
@@ -159,11 +160,13 @@ export function startApp(STATIONS) {
         // and mounted in the positioner for him (unclean edges still cost porosity)
         if (!fx.done) { fx.tacks = [true, true, true]; fx.done = true; fx.cleaned = fx.cleanDone ? fx.cleaned : clean.cleanFrac(); const P = fitup.POS[fitup.cur(state.station).pos]; setTimeout(() => showToast('info', 'تم تثبيت القطعة بالمشبك في وضع ' + P.name + '. ' + (fx.cleaned < 0.8 ? 'لم تنظّف الحواف من الصدأ، فقد تظهر مسامية.' : '')), 400); }
         if (!fx.mounted || fitup.st.k < 1) fitup.mount(state.station, false);
+        syncTacks();
       }
       state.prep = { clean: isCut ? 1 : fx.done ? fx.cleaned : 0, done: isCut || fx.done };
       const ex = isCut ? null : fitup.cur(state.station);
       sim.gLocal = fitup.gravityLocal(); sim.exercise = fx.done ? ex : null;
-      state.work = 0; state.workIdeal = sim.exercise && sim.exercise.work != null ? sim.exercise.work : null;
+      state.weave = 'none'; sim.weave = 'none';
+      state.work = 0; state.workF = null; state.angleF = null; state.workIdeal = sim.exercise && sim.exercise.work != null ? sim.exercise.work : null;
       sim.dirty = Math.max(0, 0.85 - state.prep.clean);
       if (!state.prep.done) clean.start('pre');
       clean.showRust(!isCut && state.prep.clean < 0.97);   // whatever rust was left stays on the mounted piece
@@ -241,21 +244,34 @@ export function startApp(STATIONS) {
   function fitupHTML() {
     const sid = state.station, fx = fitup.st, ex = fitup.cur(sid);
     if (isCutTask()) return `<section class="card"><h3 class="sm">القطع لا يحتاج تجهيز وصلة</h3><p class="muted small">في القطع نستخدم لوحًا واحدًا عليه خط القطع. اختر «لحام» في مرحلة الضبط لتجهيز وصلة.</p></section><button type="button" class="btn primary big" data-go="operate" data-mark="fitup">التالي ${ICON.next}</button>`;
-    const steps = [[!!fx.cleanDone, 'نظّف حواف الوصلة بالفرشاة'], [fx.tacks.every(Boolean), 'ثبّت القطع بنقاط تكميل'], [fx.mounted, 'ثبّت القطعة في وضع اللحام']];
-    const next = steps.findIndex(x => !x[0]);
+    const steps = [[!!fx.cleanDone, 'نظّف حواف الوصلة بالفرشاة'], [fx.tacks.every(Boolean), 'نقّط القطعتين بماكينة اللحام: الطرفان ثم المنتصف'], [fx.mounted, 'ثبّت القطعة في وضع اللحام']];
+    const next = steps.findIndex(x => !x[0]), ready = S().operateReady(ctx).ok, TN = ['الطرف الأول', 'الطرف الثاني', 'المنتصف'];
+    const tackUI = !ready ? `<div class="msg bad" role="status">${ICON.x}<span>التنقيط يتم بماكينة اللحام نفسها. شغّل الماكينة واضبطها أولًا.</span></div><button type="button" class="btn" data-go="operate">${ICON.reset}ارجع لضبط الماكينة</button>`
+      : `<p class="small"><b>اضغط مطوّلًا</b> على كل دائرة برتقالية لتشعل قوسًا قصيرًا (حوالي ثانية) ثم ارفع إصبعك. ابدأ بالطرفين ثم المنتصف حتى لا تتحرك القطعتان.</p>
+        <div class="row3">${[0, 1, 2].map(i => `<button type="button" class="btn sm ${fx.tacks[i] ? 'on-green' : ''}" data-act="tack:${i}" title="تنقيط تلقائي">${fx.tacks[i] ? ICON.check : ''}${TN[i]}${fx.tackQ && fx.tackQ[i] === 'big' ? ' (كبيرة)' : ''}</button>`).join('')}</div>`;
     return `<section class="card"><h3 class="sm">اختر التمرين</h3><div class="ex-list">${fitup.list(sid).map(e => `<button type="button" class="ex ${e.id === ex.id ? 'on' : ''}" data-act="ex:${e.id}"><b>${e.name}</b><span>${e.ship}</span><i>${fitup.JOINT_NAME[e.kind]} • ${e.t === e.t2 ? e.t + ' مم' : e.t + ' + ' + e.t2 + ' مم'} • ${fitup.POS[e.pos].name}</i></button>`).join('')}</div></section>
       <section class="card"><h3 class="sm">خطوات التجهيز</h3><ol class="steps">${steps.map(([ok, t], i) => `<li class="${ok ? 'done' : i === next ? 'cur' : ''}"><i>${ok ? ICON.check : AR(i + 1)}</i><span>${t}</span></li>`).join('')}</ol>
-        ${next === 0 ? `<button type="button" class="btn primary" data-act="fit-clean">${ICON.hand}ابدأ التنظيف بالفرشاة</button>` : next === 1 ? `<p class="muted small">المس الدوائر البرتقالية الثلاث على الوصلة، أو اضغط هنا:</p><div class="row3">${[0, 1, 2].map(i => `<button type="button" class="btn sm ${fx.tacks[i] ? 'on-green' : ''}" data-act="tack:${i}">${fx.tacks[i] ? ICON.check : ''}${['الطرف الأيمن', 'الطرف الأيسر', 'المنتصف'][i]}</button>`).join('')}</div>` : next === 2 ? `<button type="button" class="btn primary" data-act="fit-mount">${ICON.target}ثبّت في وضع ${fitup.POS[ex.pos].name}</button>` : ''}
+        ${next === 0 ? `<button type="button" class="btn primary" data-act="fit-clean">${ICON.hand}ابدأ التنظيف بالفرشاة</button>` : next === 1 ? tackUI : next === 2 ? `<button type="button" class="btn primary" data-act="fit-mount">${ICON.target}ثبّت في وضع ${fitup.POS[ex.pos].name}</button>` : ''}
         <p class="small">${fitup.POS_TIP[ex.pos]}${ex.work != null && ex.work > 0 ? ' وجّه الأداة نحو اللوح الأسمك بزاوية عمل حوالي ' + AR(ex.work) + '° حتى تنصهر حافتاه بالتساوي.' : ''}</p></section>
-      <button type="button" class="btn primary big" data-go="operate" data-mark="fitup" ${fx.mounted ? '' : 'disabled'}>التالي: اضبط الماكينة ${ICON.next}</button>`;
+      <button type="button" class="btn primary big" data-go="weld" data-mark="fitup" ${fx.mounted ? '' : 'disabled'}>ابدأ اللحام ${ICON.next}</button>`;
   }
   const tackLayer = $('#tacks');
+  const TACK_X = () => [JOINT.x0 + 0.006, JOINT.x1 - 0.006, (JOINT.x0 + JOINT.x1) / 2];
+  // the plates' ready-made tacks are only shown when the trainee skipped tacking (then they were done for him);
+  // tacks he made himself replace them, and before tacking there are none
+  function syncTacks() {
+    if (!plates || !fitup) return; const fx = fitup.st, mine = (fx.tackQ || []).some(Boolean);
+    plates.children.forEach(o => { if (o.userData.tack0) o.visible = fx.tacks.every(Boolean) && !mine; if (o.userData.tack && !fx.tacks.some(Boolean) && !(tack && tack.m === o)) { plates.remove(o); o.geometry.dispose(); } });
+  }
   function renderTacks() {
+    syncTacks();
     [...document.querySelectorAll('.tackpt')].forEach(b => b.remove());
     if (state.stage !== 'fitup' || isCutTask() || !fitup.st.cleanDone || fitup.st.tacks.every(Boolean)) return;
-    [JOINT.x0 + 0.006, JOINT.x1 - 0.006, (JOINT.x0 + JOINT.x1) / 2].forEach((x, i) => {
+    const ready = S().operateReady(ctx).ok;
+    TACK_X().forEach((x, i) => {
       if (fitup.st.tacks[i]) return;
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'tackpt'; b.dataset.act = 'tack:' + i; b.setAttribute('aria-label', 'نقطة تكميل ' + (i + 1)); b._x = x; tackLayer.appendChild(b);
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'tackpt' + (ready ? '' : ' off'); b.dataset.ti = i; b.setAttribute('aria-label', 'نقطة تكميل ' + (i + 1) + ': اضغط مطوّلًا'); b._x = x;
+      b.innerHTML = '<i></i>'; tackLayer.appendChild(b);
     });
   }
   function updateTacks() {
@@ -263,16 +279,55 @@ export function startApp(STATIONS) {
     const w = viewport.clientWidth, h = viewport.clientHeight;
     els.forEach(b => { _dp.set(b._x, JOINT.y + 0.002, JOINT.z + 0.002); _dp.project(E.camera); b.style.transform = `translate(${(_dp.x * 0.5 + 0.5) * w}px, ${(-_dp.y * 0.5 + 0.5) * h}px)`; });
   }
-  function doTack(i) {
-    const fx = fitup.st; if (fx.tacks[i]) return;
-    fx.tacks[i] = true; audio.sfx('pop'); audio.sfx('chip');
-    const t = new THREE.Mesh(new THREE.SphereGeometry(0.005, 14, 10), new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8, emissive: 0xff7a1a, emissiveIntensity: 2 }));
-    const x = [JOINT.x0 + 0.006, JOINT.x1 - 0.006, (JOINT.x0 + JOINT.x1) / 2][i];
-    t.scale.set(1.3, 0.45, 0.9); t.position.set(x, JOINT.y + 0.0012, JOINT.z + (JOINT.kind === 'butt' ? 0 : 0.002)); plates.add(t);
-    E.tween(1.4, k => { t.material.emissiveIntensity = 2 * (1 - k); });
-    renderTacks(); renderPanel();
-    if (fx.tacks.every(Boolean)) { showToast('good', 'تم تثبيت القطع بثلاث نقاط تكميل. الآن ثبّتها في وضع اللحام.'); }
+  // ---- tack welding with the machine: press and hold on a tack point = a short arc; the tack grows while the arc burns
+  let tack = null, tackFx = null;
+  function tackVisual() {
+    if (tackFx) return tackFx;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: Textures.glowSprite(), color: 0xd6ecff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
+    const li = new THREE.PointLight(0xbfe0ff, 0, 0.9, 1.6); sp.visible = false; fitup.posFrame.add(sp, li);
+    return (tackFx = { sp, li });
   }
+  function startTack(i, ts) {
+    const fx = fitup.st; if (tack || fx.tacks[i] || state.stage !== 'fitup') return;
+    const s = S(); if (!s.operateReady(ctx).ok) { showToast('bad', 'التنقيط يتم بماكينة اللحام. شغّل الماكينة واضبطها أولًا.'); return; }
+    if (i === 2 && !(fx.tacks[0] && fx.tacks[1]) && fx.tackOrder !== false) { fx.tackOrder = false; showToast('bad', 'الأصح أن تنقّط الطرفين أولًا ثم المنتصف؛ وإلا قد تتحرك القطعتان وتضيق الفتحة.'); }
+    const proc = s.weldProc(ctx), x = TACK_X()[i], gas = proc.sound === 'flame';
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.005, 16, 12), new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8, emissive: 0xff7a1a, emissiveIntensity: 2.4 }));
+    m.scale.setScalar(0.001); m.userData.tack = true; m.position.set(x, JOINT.y + 0.001, JOINT.z + (JOINT.kind === 'butt' ? 0 : 0.0018)); plates.add(m);
+    const v = tackVisual(); v.sp.visible = true; v.sp.material.color.set(gas ? 0xffb070 : 0xd6ecff); v.sp.position.set(x, JOINT.y + 0.004, JOINT.z + 0.002); v.li.position.copy(v.sp.position);
+    tack = { i, t: 0, t0: ts ?? performance.now(), m, gas, sound: proc.sound, shade: proc.lensShade || 'arc' };
+    audio.ensure(); if (state.lens !== false) { $('#lens').dataset.shade = tack.shade; $('#lens').classList.add('on'); }
+    E.always = true;
+  }
+  function tackFrame(dt) {
+    if (!tack) return;
+    tack.t = (performance.now() - tack.t0) / 1000; const k = Math.min(1.7, tack.t / 1.1), fl = 0.7 + Math.random() * 0.6, v = tackVisual();
+    tack.m.scale.set(1.3 * k, 0.5 * k, 0.95 * k);
+    v.sp.scale.setScalar((tack.gas ? 0.03 : 0.05) * fl); v.li.intensity = (tack.gas ? 0.25 : 0.6) * fl;
+    audio.update(true, 1, tack.sound);
+    if (!tack.gas && sim) sim.emitSparks(Math.round(40 * dt + Math.random() * 0.6), tack.m.position.x, JOINT.y, 'up');
+    if (tack.t > 3.2 && !tack.auto) endTack();   // nobody holds a tack that long: stop it for him
+  }
+  function endTack(ts) {
+    if (!tack) return;
+    const T = tack, fx = fitup.st, v = tackVisual(); tack = null; T.t = ((ts ?? performance.now()) - T.t0) / 1000;   // real time the finger was held (event timestamps, not frame time)
+    T.m.scale.set(1.3 * Math.min(1.7, T.t / 1.1), 0.5 * Math.min(1.7, T.t / 1.1), 0.95 * Math.min(1.7, T.t / 1.1));
+    v.sp.visible = false; v.li.intensity = 0; audio.update(false); $('#lens').classList.remove('on');
+    fx.tackQ = fx.tackQ || [null, null, null];
+    if (T.t < 0.55) {   // too short: a cold, weak tack that would crack — remove it, do it again
+      E.tween(0.6, k => { T.m.material.emissiveIntensity = 2.4 * (1 - k); }, () => { plates.remove(T.m); T.m.geometry.dispose(); });
+      showToast('bad', 'النقطة قصيرة جدًا فخرجت باردة وضعيفة وقد تنكسر. أعد التنقيط واضغط حوالي ثانية.'); audio.sfx('err'); renderTacks(); return;
+    }
+    fx.tacks[T.i] = true; fx.tackQ[T.i] = T.t > 2.3 ? 'big' : 'ok'; audio.sfx('chip');
+    E.tween(1.6, k => { T.m.material.emissiveIntensity = 2.4 * (1 - k); });
+    if (fx.tackQ[T.i] === 'big') showToast('bad', 'النقطة كبيرة جدًا وبارزة، وستعيق خط اللحام فوقها. النقطة الجيدة صغيرة: ثانية إلى ثانيتين فقط.');
+    renderTacks(); renderPanel();
+    if (fx.tacks.every(Boolean)) showToast('good', 'تم تنقيط القطعتين' + (fx.tackOrder === false ? '، لكن تذكّر: الطرفان أولًا ثم المنتصف.' : ' بالترتيب الصحيح.') + ' الآن ثبّتها في وضع اللحام.');
+  }
+  // panel buttons: a correct tack done for him (accessibility / quick demo)
+  function doTack(i) { if (tack || fitup.st.tacks[i]) return; startTack(i); if (tack) { tack.auto = true; const t0 = tack.t0; setTimeout(() => tack && tack.i === i && endTack(t0 + 1100), 1100); } }   // a correct ~1 s tack, whatever the timer delay
+  window.addEventListener('pointerdown', ev => { const b = ev.target.closest && ev.target.closest('.tackpt'); if (!b) return; ev.preventDefault(); try { b.setPointerCapture(ev.pointerId); } catch (e) { /* */ } startTack(+b.dataset.ti, ev.timeStamp); });
+  ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, ev => { if (tack) endTack(ev.timeStamp); }));
   function cleanCamera() { return { pos: V3(0.3, JOINT.y + 0.27, JOINT.z + 0.17), target: V3(0.3, JOINT.y, JOINT.z) }; }
   // ---- hands-on cleaning (wire brush before welding, chipping hammer + brush after)
   const CLEAN_TXT = {
@@ -292,7 +347,7 @@ export function startApp(STATIONS) {
     if (e.done === 'pre' && state.stage === 'fitup') {
       fitup.st.cleaned = clean.cleanFrac(); fitup.st.cleanDone = true;
       if (fitup.st.cleaned < 0.8) { showToast('bad', 'لم تُنظَّف الحواف جيدًا؛ قد تظهر مسامية في الخط.'); renderPanel(); renderTacks(); renderClean(); return; }
-      showToast('good', 'الحواف نظيفة. الآن ثبّت القطع بنقاط تكميل.'); const c = fitupCamera(); E.flyTo(c.pos, c.target, 0.8); renderPanel(); renderTacks(); renderClean(); return;
+      showToast('good', 'الحواف نظيفة. الآن نقّط القطعتين بالماكينة: الطرفان ثم المنتصف.'); const c = fitupCamera(); E.flyTo(c.pos, c.target, 0.8); renderPanel(); renderTacks(); renderClean(); return;
     }
     if (e.done === 'pre') {
       state.prep = { clean: clean.cleanFrac(), done: true }; sim.dirty = Math.max(0, 0.85 - state.prep.clean);
@@ -579,7 +634,7 @@ export function startApp(STATIONS) {
     w.eff = d;
     // beginner: torch travels by itself at the right speed (waits for heat in gas welding/cutting); filler/cutting O2 automatic
     if (state.level === 'beg' && w.pressing) {
-      const pr = sim.proc, v = (pr.ideal.speed[0] + pr.ideal.speed[1]) / 2, heatOK = !pr.heatNeed || sim.heatAt(w.autoX ?? w.x) >= pr.heatNeed;
+      const pr = sim.proc, v = (pr.ideal.speed[0] + pr.ideal.speed[1]) / 2 * (WEAVE[sim.weave] || WEAVE.none).k, heatOK = !pr.heatNeed || sim.heatAt(w.autoX ?? w.x) >= pr.heatNeed;
       if (w.autoX == null) w.autoX = Math.max(JOINT.x0, Math.min(sim.progress, JOINT.x1));
       if (sim.on && heatOK) w.autoX += v / 1000 * dt;
       w.x = w.autoX;
@@ -589,7 +644,7 @@ export function startApp(STATIONS) {
     if (state.workIdeal != null && state.level === 'beg') state.work = state.workIdeal;
     const out = sim.step({ pressing: w.pressing, x: w.x, dist: d, angle: state.angle, aux: w.aux, work: state.work || 0 }, dt);
     if (out.msg) showToast(out.msg.t, out.msg.s);
-    const target = V3(w.x, JOINT.y + (w.pressing && !sim.stuck ? Math.max(0.0003, d / 1000) : w.pressing ? 0.0002 : 0.025), JOINT.z);
+    const target = V3(w.x, JOINT.y + (w.pressing && !sim.stuck ? Math.max(0.0003, d / 1000) : w.pressing ? 0.0002 : 0.025), JOINT.z + (sim.on ? sim.weaveZ : 0));
     if (!w.pressing && state.control === 'rel') target.x = Math.max(JOINT.x0 - 0.01, Math.min(sim.progress, JOINT.x1));
     tipPos.lerp(target, 1 - Math.pow(0.0004, dt));
     const W = fitup.W(), moved = !isIdentity(W) || state.work;
@@ -609,8 +664,8 @@ export function startApp(STATIONS) {
   function bindSticks() {
     const l = $('#stick-l'), r = $('#stick-r'); if (!r) return;
     const bind = (el, key) => {
-      const set = ev => { if (state.padEdit) return; const b = el.getBoundingClientRect(); sticks[key] = { x: THREE.MathUtils.clamp((ev.clientX - b.left) / b.width, 0, 1), y: THREE.MathUtils.clamp(1 - (ev.clientY - b.top) / b.height, 0, 1), id: ev.pointerId }; drawStick(el, sticks[key]); };
-      el.addEventListener('pointerdown', ev => { ev.preventDefault(); audio.ensure(); try { el.setPointerCapture(ev.pointerId); } catch (e) {} set(ev); if (key === 'R') { const w = state.weld; w.pid = ev.pointerId; } });
+      const set = ev => { if (state.padEdit) return; const b = el.getBoundingClientRect(), o = sticks[key] && sticks[key].id === ev.pointerId ? sticks[key] : {}; sticks[key] = Object.assign(o, { x: THREE.MathUtils.clamp((ev.clientX - b.left) / b.width, 0, 1), y: THREE.MathUtils.clamp(1 - (ev.clientY - b.top) / b.height, 0, 1), id: ev.pointerId }); drawStick(el, sticks[key]); };
+      el.addEventListener('pointerdown', ev => { ev.preventDefault(); audio.ensure(); try { el.setPointerCapture(ev.pointerId); } catch (e) {} set(ev); const k = sticks[key]; k.x0 = k.x; k.y0 = k.y; k.a0 = state.angle; k.w0 = state.work || 0; if (key === 'R') { const w = state.weld; w.pid = ev.pointerId; } });
       el.addEventListener('pointermove', ev => { if (sticks[key] && sticks[key].id === ev.pointerId) set(ev); });
       const end = ev => { if (sticks[key] && sticks[key].id === ev.pointerId) { sticks[key] = null; drawStick(el, null); if (key === 'R') { state.weld.pressing = false; } } };
       el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
@@ -639,18 +694,33 @@ export function startApp(STATIONS) {
     if (!padDrag || ev.pointerId !== padDrag.id) return; const el = padDrag.el, r = el.getBoundingClientRect();
     store.set('pad.' + el.id, { x: r.left / innerWidth, y: r.top / innerHeight }); padDrag = null;
   }, true);
-  function drawStick(el, v) { const k = el.querySelector('.knob'); if (!k) return; el.classList.toggle('on', !!v); if (el.id === 'stick-l') k.style.left = (v ? v.x * 100 : 50) + '%'; else { k.style.left = (v ? v.x * 100 : 50) + '%'; k.style.bottom = (v ? v.y * 100 : 50) + '%'; } }
+  function drawStick(el, v) { const k = el.querySelector('.knob'); if (!k) return; el.classList.toggle('on', !!v); if (el.id === 'stick-l' && !el.classList.contains('xy')) k.style.left = (v ? v.x * 100 : 50) + '%'; else { k.style.left = (v ? v.x * 100 : 50) + '%'; k.style.bottom = (v ? v.y * 100 : 50) + '%'; } }
   function stickRange() { const p = sim.proc; return { max: p.breakAbove != null ? p.breakAbove + 1 : p.ideal.dist[1] * 2.2 }; }
+  // hand sensitivity: how many degrees a full sweep of the thumb turns the torch, and how much the hand is steadied
+  const SENS = { low: { name: 'هادئة', range: 26, smooth: 0.02 }, mid: { name: 'متوسطة', range: 45, smooth: 0.004 }, high: { name: 'عالية', range: 75, smooth: 0.0006 } };
+  state.sens = store.get('sens', 'mid');
+  // both torch angles are steered RELATIVE to where the thumb landed (no jump when you touch), with a small dead zone
+  const rel = (v, v0) => { const d = v - v0; return Math.abs(d) < 0.02 ? 0 : d - Math.sign(d) * 0.02; };
   function sticksFrame(dt) {
     if (state.control !== 'sticks' || state.stage !== 'weld') return;
-    const w = state.weld, p = sim.proc, R = sticks.R, L = sticks.L;
+    const w = state.weld, p = sim.proc, R = sticks.R, L = sticks.L, G = SENS[state.sens] || SENS.mid, k = 1 - Math.pow(G.smooth, dt);
     if (R) {
       if (!w.pressing) { w.x = Math.max(JOINT.x0, Math.min(sim.progress, JOINT.x1)); }
       w.pressing = true; w.dist = R.y * stickRange().max;
-      if (state.workIdeal != null && state.level !== 'beg') { state.work = Math.round((R.x - 0.5) * 60); const wv = $('#work-v'); if (wv) wv.textContent = state.work + '°'; const wi = $('#work'); if (wi) wi.value = state.work; }
-      else if (p.angle !== false && state.level === 'adv') { state.angle = Math.round(40 + R.x * 50); const av = $('#angle-v'); if (av) av.textContent = state.angle + '°'; const a = $('#angle'); if (a) a.value = state.angle; }
+      // right thumb ↔ : WORK angle (tilt between the two plates) on fillet / unequal joints
+      if (state.workIdeal != null && state.level !== 'beg' && R.w0 != null) {
+        const tgt = THREE.MathUtils.clamp(R.w0 + rel(R.x, R.x0) * G.range, -30, 30);
+        state.workF = (state.workF ?? state.work ?? 0) + (tgt - (state.workF ?? state.work ?? 0)) * k; state.work = Math.round(state.workF);
+        const wv = $('#work-v'); if (wv) wv.textContent = state.work + '°'; const wi = $('#work'); if (wi) wi.value = state.work;
+      }
     }
+    // left thumb ↔ : travel along the joint;  ↕ : TRAVEL angle (lean of the electrode / torch along the line)
     if (L && w.pressing && state.level !== 'beg') { const v = (L.x - 0.5) * 2, vmax = p.ideal.speed[1] * 1.9; w.x = THREE.MathUtils.clamp(w.x + (Math.abs(v) < 0.06 ? 0 : v) * vmax / 1000 * dt, JOINT.x0 - 0.02, JOINT.x1 + 0.01); }
+    if (L && state.level !== 'beg' && p.angle !== false && L.a0 != null) {
+      const tgt = THREE.MathUtils.clamp(L.a0 + rel(L.y, L.y0) * G.range, 30, 90);
+      state.angleF = (state.angleF ?? state.angle) + (tgt - (state.angleF ?? state.angle)) * k; state.angle = Math.round(state.angleF);
+      const av = $('#angle-v'); if (av) av.textContent = state.angle + '°'; const a = $('#angle'); if (a) a.value = state.angle;
+    }
   }
   let lastBuzz = 0;
   function haptics(d, mid, out) {
@@ -799,7 +869,8 @@ export function startApp(STATIONS) {
   }
   function operateHTML() {
     const s = S(), r = s.operateReady(ctx);
-    return s.operateHTML(ctx) + `<button type="button" class="btn primary big" data-go="weld" data-mark="operate" ${r.ok ? '' : 'disabled'}>${r.label} ${ICON.next}</button>`;
+    const toFit = s.stages.some(x => x[0] === 'fitup') && !isCutTask();
+    return s.operateHTML(ctx) + `<button type="button" class="btn primary big" data-go="${toFit ? 'fitup' : 'weld'}" data-mark="operate" ${r.ok ? '' : 'disabled'}>${toFit && r.ok ? 'التالي: جهّز الوصلة' : r.label} ${ICON.next}</button>`;
   }
   function inspectHTML() {
     const s = S(), R = state.report;
@@ -818,7 +889,7 @@ export function startApp(STATIONS) {
       <section class="card"><h3 class="sm">العيوب التي ظهرت</h3>
         ${clean && clean.active ? '<p class="muted small">ستظهر العيوب على الخط بعد التنظيف.</p>' : ''}${R.defects.length ? R.defects.map((d, i) => `<div class="defect" data-act="def-focus" data-i="${i}" role="button" tabindex="0" style="--c:#${DCOL[i % DCOL.length].toString(16).padStart(6, '0')}"><i>${AR(i + 1)}</i><div><b>${d.name} <small class="mono muted">${d.en}</small></b><span><b>السبب:</b> ${d.cause}</span><span><b>العلاج:</b> ${d.fix}</span></div></div>`).join('') : '<p class="good-t">لا توجد عيوب واضحة. عمل نظيف!</p>'}
       </section>
-      ${R.kind !== 'cut' ? `<section class="card"><h3 class="sm">قطاع عرضي تقريبي</h3>${sectionSVG(R)}</section>` : ''}
+      ${R.kind !== 'cut' ? `<section class="card"><h3 class="sm">المقطع العرضي للخط</h3>${sectionSVG(R)}</section>` : ''}
       ${s.inspectExtra ? s.inspectExtra(ctx) : ''}
       ${attempts.length > 1 ? `<section class="card"><h3 class="sm">آخر محاولاتك</h3><div class="attempts">${attempts.map(a => `<span><b class="mono">${a.total}</b><small>${a.when}</small></span>`).join('')}</div></section>` : ''}
       <div class="row2">
@@ -830,16 +901,66 @@ export function startApp(STATIONS) {
         <button type="button" class="btn primary" data-act="finish-station" data-mark="inspect">إنهاء المحطة</button>
       </div>`;
   }
+  // ---- macro section: the coupon is cut across the middle of the bead, polished and etched — the trainee sees
+  // the real profile of the joint (both plates, bevel / taper, web), the weld metal, the heat-affected zone,
+  // how deep it fused, the leg / throat of a fillet, and the defects that live inside the weld.
   function sectionSVG(R) {
-    const w = R.width, h = R.height, p = R.penetration, sx = 12, cx = 190, top = 70, T = Math.max(2, JOINT.t * 1000) * sx;
-    const hw = w / 2 * sx, hh = h * sx, pen = T * Math.min(1.1, p);
-    return `<svg viewBox="0 0 380 ${top + T + 50}" class="xsec" role="img" aria-label="قطاع عرضي: عرض ${w.toFixed(1)} مم وارتفاع ${h.toFixed(1)} مم">
-      <rect x="20" y="${top}" width="${cx - 22}" height="${T}" class="pl"/><rect x="${cx + 2}" y="${top}" width="${cx - 22}" height="${T}" class="pl"/>
-      <path d="M${cx - hw},${top} Q${cx},${top - hh * 2} ${cx + hw},${top} L${cx + 4},${top + pen} Q${cx},${top + pen + 6} ${cx - 4},${top + pen} Z" class="wm"/>
-      <line x1="${cx - hw}" y1="${top - hh - 16}" x2="${cx + hw}" y2="${top - hh - 16}" class="dim"/>
-      <text x="${cx}" y="${top - hh - 24}" text-anchor="middle">عرض ${w.toFixed(1)} مم</text>
-      <text x="${cx + hw + 10}" y="${top - hh / 2}">ارتفاع ${h.toFixed(1)} مم</text>
-      <text x="${cx}" y="${top + T + 34}" text-anchor="middle">${p >= 0.95 ? 'اختراق كامل للجذر' : p >= 0.7 ? 'اختراق جزئي' : 'اختراق ضعيف'}</text></svg>`;
+    const ex = sim.exercise, kind = ex ? ex.kind : JOINT.kind === 'single' ? 'butt' : JOINT.kind, t1 = ex ? ex.t : JOINT.t * 1000, t2 = ex ? (ex.t2 ?? ex.t) : t1;
+    const names = R.defects.map(d => d.name).join(' '), has = re => re.test(names);
+    const pen = R.penetration ?? 1, W = Math.max(2, R.width), H = Math.max(0.4, R.height);
+    const sag = has(/ترهّل|تدلّي|تساقط/), por = has(/مسامية/), uc = has(/تآكل|حرق/), lof = has(/عدم انصهار|انصهار ناقص|تراكب|مرتفع وعريض/), lop = has(/اختراق/) || pen < 0.7;
+    const VW = 380, VH = 280, cx = 190;
+    // fit the drawing: horizontal span and vertical extent (top of cap / web … bottom of the thickest plate)
+    const thickB = Math.max(t1, t2), legE = THREE.MathUtils.clamp(W * 0.55, 2, 14);
+    const span = kind === 'butt' ? thickB * 2.6 + W * 1.1 : Math.max(thickB, legE) * 2.6 + 6;
+    const topMM = kind === 'butt' ? H * 2 + 3.5 + (t1 !== t2 ? Math.abs(t1 - t2) : 0) : kind === 'tee' ? Math.max(legE * 2.2, 10) : t2 + legE * 0.3 + 2;
+    const botMM = kind === 'butt' ? Math.min(t1, t2) + 1.5 : t1 + 0.8;
+    const sc = Math.min(15, 330 / span, (VH - 70) / (topMM + botMM)), cy = 30 + topMM * sc, X = x => (cx + x * sc).toFixed(1), Y = y => (cy - y * sc).toFixed(1), P = (x, y) => X(x) + ',' + Y(y);
+    const Lx = (VW / 2 - 14) / sc;
+    let plates = '', weld = '', extra = '', dims = '', title = '';
+    if (kind === 'butt') {
+      const g = 0.8, thin = Math.min(t1, t2), thick = Math.max(t1, t2), tap = (thick - thin) * 4;
+      plates = `<path class="pl" d="M${P(-Lx, 0)} L${P(-g / 2, 0)} L${P(-g / 2, -thin)} L${P(-Lx, -thin)} Z"/>` +
+        `<path class="pl" d="M${P(g / 2, 0)} L${P(g / 2 + tap, thick - thin)} L${P(Lx, thick - thin)} L${P(Lx, -thin)} L${P(g / 2, -thin)} Z"/>`;
+      const pd = thin * Math.min(1, pen), toeR = W / 2, yR = thick > thin ? Math.min(thick - thin, (toeR - g / 2) / Math.max(0.1, tap) * (thick - thin)) : 0;
+      const capY = H + yR / 2 + (sag ? -H * 0.25 : 0), lowShift = sag ? -W * 0.18 : 0;
+      const root = pen >= 1 ? `Q${P(0, -thin - 1)} ${P(-g / 2 - 0.4, -thin)}` : `Q${P(0, -pd - 0.6)} ${P(-g / 2 - 0.4, -pd)}`;
+      weld = `M${P(-W / 2 + lowShift, 0)} Q${P(lowShift * 0.5, capY * 2)} ${P(toeR, yR)} L${P(g / 2 + 0.4, pen >= 1 ? -thin : -pd)} ${root} Z`;
+      if (lop) extra += `<path class="lof" d="M${P(0, -pd - 0.2)} L${P(0, -thin)}"/>`;
+      if (uc) extra += `<path class="cut" d="M${P(toeR - 0.1, yR + 0.05)} l${(0.9 * sc).toFixed(1)},0 l${(-0.45 * sc).toFixed(1)},${(0.6 * sc).toFixed(1)} Z"/>`;
+      if (lof) extra += `<path class="lof" d="M${P(-W / 2 + lowShift, 0.02)} L${P(-W / 2 - 0.9 + lowShift, 0.02)}"/>`;
+      dims = `<path class="dim" d="M${P(-W / 2, capY + 1.6)} L${P(toeR, capY + 1.6)}"/><text x="${X(0)}" y="${+Y(capY + 1.6) - 7}" text-anchor="middle">عرض الخط ${W.toFixed(1)} مم • التحدّب ${H.toFixed(1)} مم</text>` +
+        `<text x="${cx}" y="${VH - 12}" text-anchor="middle" class="${pen >= 0.95 ? 'ok' : 'bad'}">${pen >= 0.95 ? 'اختراق كامل حتى الجذر' : 'الاختراق ' + AR(Math.round(Math.min(1, pen) * 100)) + '٪ من السُمك — الجذر غير منصهر'}</text>`;
+      title = t1 === t2 ? `وصلة تناكبية ${AR(t1)} مم` : `وصلة تناكبية ${AR(thin)} + ${AR(thick)} مم (اللوح السميك مشطوف ١:٤)`;
+    } else {
+      const tee = kind === 'tee', tb = t1, tw = t2, leg = legE, legV = tee ? leg : Math.min(leg, tw + 0.2);
+      const webH = tee ? Math.max(leg * 2.2, 10) : tw;
+      plates = `<path class="pl" d="M${P(-Lx, 0)} L${P(Lx, 0)} L${P(Lx, -tb)} L${P(-Lx, -tb)} Z"/>` +
+        (tee ? `<path class="pl" d="M${P(-tw, 0)} L${P(0, 0)} L${P(0, webH)} L${P(-tw, webH)} Z"/>` : `<path class="pl" d="M${P(-Lx, 0)} L${P(0, 0)} L${P(0, tw)} L${P(-Lx, tw)} Z"/>`);
+      const pd = 0.6 + 1.6 * Math.min(1.2, pen), conv = (H - leg * 0.75) * 0.6, sh = sag ? leg * 0.25 : 0;
+      const cxF = leg * 0.5 + conv + 0.3, cyF = legV * 0.5 + conv + 0.3 - sh;
+      weld = `M${P(leg + sh, 0)} Q${P(leg * 0.45, -pd)} ${P(-pd * 0.55, -pd * 0.55)} Q${P(-pd, legV * 0.45)} ${P(0, legV - sh * 0.5)} Q${P(cxF, cyF + legV * 0.15)} ${P(leg + sh, 0)} Z`;
+      if (lop) extra += `<path class="lof" d="M${P(-0.1, -0.1)} L${P(-pd * 0.3, -pd * 0.3)}"/>`;
+      if (uc) extra += `<path class="cut" d="M${P(0.05, legV - 0.1)} l${(-0.7 * sc).toFixed(1)},0 l${(0.35 * sc).toFixed(1)},${(-0.6 * sc).toFixed(1)} Z"/>`;
+      if (lof) extra += `<path class="lof" d="M${P(leg + sh, 0.03)} L${P(leg + sh + 1, 0.03)}"/>`;
+      const a = Math.min(leg, legV) * 0.707, want = Math.min(tb, tw);
+      dims = `<path class="dim" d="M${P(0.2, -0.5)} L${P(leg + sh, -0.5)}"/><text x="${+X(leg + sh) + 8}" y="${+Y(-0.5) + 5}">طول الساق ${leg.toFixed(1)} مم</text>` +
+        `<path class="dim thr" d="M${P(0, 0)} L${P(a * 0.707, a * 0.707)}"/><text x="${+X(Math.max(leg, a) * 0.85) + 10}" y="${Y(legV * 0.95)}">الحلق ≈ ${a.toFixed(1)} مم</text>` +
+        `<text x="${cx}" y="${VH - 12}" text-anchor="middle" class="${Math.abs(leg - want) <= want * 0.35 ? 'ok' : 'bad'}">المطلوب: ساق ≈ سُمك اللوح الأرق (${AR(want)} مم) • ${conv > 0.6 ? 'سطح محدّب زيادة' : conv < -0.6 ? 'سطح مقعّر' : 'سطح مستوٍ تقريبًا'}</text>`;
+      title = tee ? `وصلة زاوية T: عصب ${AR(tw)} مم على لوح ${AR(tb)} مم` : `وصلة تراكبية: ${AR(tw)} مم فوق ${AR(tb)} مم`;
+    }
+    const pores = por ? [[-0.15, 0.35], [0.12, 0.55], [0.3, 0.2]].map(([u, v]) => `<circle class="pore" cx="${X(u * W * (kind === 'butt' ? 1 : 0.8) + (kind === 'butt' ? 0 : W * 0.15))}" cy="${Y(v * Math.max(H, kind === 'butt' ? H : W * 0.3) * (kind === 'butt' ? 1 : 1))}" r="${Math.max(2.2, 0.35 * sc).toFixed(1)}"/>`).join('') : '';
+    const grains = Array.from({ length: 7 }, (_, i) => { const u = (i - 3) / 3.5; return `<path class="gr" d="M${P(u * W * 0.4 + (kind === 'butt' ? 0 : W * 0.2), kind === 'butt' ? -0.4 : 0.3)} L${P(u * W * 0.15 + (kind === 'butt' ? 0 : W * 0.22), kind === 'butt' ? H * 0.7 : W * 0.22)}"/>`; }).join('');
+    return `<p class="muted small">${title} — مقطع في منتصف الخط بعد قطعه وصقله وحفره بالحمض (Macro-etch). مكبّر حوالي ×${AR(Math.round(sc / 3.8))}.</p>
+      <svg viewBox="0 0 ${VW} ${VH}" class="xsec" role="img" aria-label="مقطع عرضي للخط">
+        <defs><pattern id="xs-h" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><line x1="0" y1="0" x2="0" y2="7" stroke="rgba(255,255,255,.07)" stroke-width="2"/></pattern>
+          <clipPath id="xs-w"><path d="${weld}"/></clipPath></defs>
+        <rect width="${VW}" height="${VH}" rx="12" class="bg"/>
+        ${plates}<g fill="url(#xs-h)">${plates.replace(/class="pl"/g, 'class="plh"')}</g>
+        <path class="haz" d="${weld}"/><path class="wm2" d="${weld}"/><g clip-path="url(#xs-w)">${grains}</g>${pores}${extra}
+        ${dims}
+      </svg>
+      <div class="xs-leg"><span><i class="k-pl"></i>معدن الأساس</span><span><i class="k-haz"></i>المنطقة المتأثرة بالحرارة</span><span><i class="k-wm"></i>معدن اللحام</span>${por ? '<span><i class="k-po"></i>مسامية</span>' : ''}${lof || lop ? '<span><i class="k-lf"></i>عدم انصهار / اختراق ناقص</span>' : ''}${uc ? '<span><i class="k-uc"></i>تآكل الحافة</span>' : ''}</div>`;
   }
 
   function renderPanel() {
@@ -863,32 +984,38 @@ export function startApp(STATIONS) {
     const proc = sim.proc;
     const gauges = s.hud(ctx);
     hud.innerHTML = `
-      <div class="gauges">${gauges.map(g => `<div class="g" id="g-${g.id}"><span class="l">${g.label}</span><b class="mono v">--</b>${g.bar === false ? '' : '<div class="m" dir="ltr"><i class="z"></i><i class="n"></i></div>'}<small class="mono t">${g.hint || ''}</small></div>`).join('')}</div>
+      <div class="gauges">${(state.workIdeal != null && state.level !== 'beg' ? gauges.concat([{ id: 'work', label: 'زاوية العمل', hint: 'المثالي ≈ ' + AR(state.workIdeal) + '°' }]) : gauges).map(g => `<div class="g" id="g-${g.id}"><span class="l">${g.label}</span><b class="mono v">--</b>${g.bar === false ? '' : '<div class="m" dir="ltr"><i class="z"></i><i class="n"></i></div>'}<small class="mono t">${g.hint || ''}</small></div>`).join('')}</div>
       ${state.workIdeal != null && state.level !== 'beg' ? `<div class="work-ctl glass"><label for="work">زاوية العمل <small>${state.workIdeal > 0 ? '(نحو اللوح الأسمك ≈ ' + AR(state.workIdeal) + '°)' : '(على منتصف الزاوية)'}</small></label><div class="wk"><input id="work" type="range" min="-30" max="30" value="${state.work || 0}" aria-label="زاوية العمل"><i class="ideal" style="left:${((state.workIdeal + 30) / 60 * 100).toFixed(1)}%"></i></div><b class="mono" id="work-v">${state.work || 0}°</b></div>` : ''}
       ${proc.angle !== false ? `<div class="angle-ctl"><label for="angle">${proc.angleShort || 'الزاوية'}</label><input id="angle" type="range" min="30" max="90" value="${state.angle}" aria-label="${proc.angleName || 'زاوية الميل'}"><b class="mono" id="angle-v">${state.angle}°</b></div>` : ''}
       <div class="weld-tools">
         ${proc.lens !== false ? `<button type="button" class="btn ${state.lens ? 'on-green' : ''}" data-act="lens">${ICON.lens}<span>${proc.lensName || 'الماسك'}</span></button>` : ''}
         <button type="button" class="btn" data-act="control">${ICON.hand}<span>${CTRL_NAME[state.control]}</span></button>
         ${state.control === 'sticks' ? `<button type="button" class="btn ${state.padEdit ? 'on' : ''}" data-act="pad-edit" aria-label="ترتيب أدوات التحكم">${ICON.target}<span>${state.padEdit ? 'تم' : 'ترتيب التحكم'}</span></button>` : ''}
+        ${proc.kind !== 'cut' ? `<button type="button" class="btn ${state.optsOpen ? 'on' : ''}" data-act="weld-opts" aria-expanded="${!!state.optsOpen}">${ICON.target}<span>الحركة: ${(WEAVE[state.weave] || WEAVE.none).name}</span></button>` : ''}
         <div class="lvl" role="group" aria-label="مستوى الصعوبة">${Object.entries(LEVELS).map(([k, v]) => `<button type="button" class="${state.level === k ? 'on' : ''}" data-act="level:${k}">${v}</button>`).join('')}</div>
         ${proc.consumable ? `<button type="button" class="btn" data-act="new-consumable">${ICON.reset}<span>${proc.consumable.newName}</span></button>` : ''}
         <button type="button" class="btn primary" data-act="finish">افحص ${ICON.next}</button>
       </div>
+      ${state.optsOpen && proc.kind !== 'cut' ? `<div class="weld-opts glass" role="dialog" aria-label="حركة الأداة وحساسية اليد">
+        <b>حركة الأداة</b><div class="lvl weave" role="group">${Object.entries(WEAVE).map(([k, v]) => `<button type="button" class="${(state.weave || 'none') === k ? 'on' : ''}" data-act="weave:${k}">${v.name}</button>`).join('')}</div>
+        <small>${(state.weave || 'none') === 'none' ? 'خط مستقيم (Stringer): للمسطح والأفقي والصاج الرقيق.' : state.weave === 'tri' ? 'مثلث: من حافة لحافة مع توقف لحظة عند كل حافة؛ تقدّم ٢–٣ مم كل دورة. الأفضل للرأسي الصاعد.' : 'زجزاج: تذبذب منتظم يعرّض الخط؛ أبطئ التقدّم قليلًا.'}</small>
+        ${state.control === 'sticks' && state.level !== 'beg' ? `<b>حساسية اليد</b><div class="lvl sens" role="group">${Object.entries(SENS).map(([k, v]) => `<button type="button" class="${state.sens === k ? 'on' : ''}" data-act="sens:${k}">${v.name}</button>`).join('')}</div><small>الهادئة: الزاوية تتغير ببطء وثبات (للمبتدئ). العالية: حركة سريعة مثل اليد الحقيقية.</small>` : ''}
+        <button type="button" class="btn sm primary" data-act="weld-opts">تم</button></div>` : ''}
       ${state.padEdit ? `<div class="pad-bar glass"><b>اسحب لوحات التحكم إلى المكان المريح ليديك</b><span>الحجم</span>${[0.85, 1, 1.25, 1.5].map(z => `<button type="button" class="${+store.get('padScale', 1) === z ? 'on' : ''}" data-act="pad-size:${z}">${z === 0.85 ? 'صغير' : z === 1 ? 'عادي' : z === 1.25 ? 'كبير' : 'كبير جدًا'}</button>`).join('')}<button type="button" data-act="pad-reset">الأماكن الأصلية</button><button type="button" class="primary" data-act="pad-edit">تم</button></div>` : ''}
       ${state.control === 'sticks' ? `<div class="sticks">
-        ${state.level !== 'beg' ? `<div id="stick-l" class="stick h"><span class="cap">الحركة على الخط</span><i class="rail"></i><b class="knob"></b><small class="lr"><span>رجوع</span><span>تقدّم</span></small></div>` : `<div class="stick-note">المستوى المبتدئ: الأداة تتحرك وحدها بالسرعة الصحيحة.<br>تحكّم أنت في ${proc.distName}.</div>`}
-        <div id="stick-r" class="stick xy"><span class="cap">${proc.distName}${state.workIdeal != null && state.level !== 'beg' ? ' + زاوية العمل' : proc.angle !== false && state.level === 'adv' ? ' + الزاوية' : ''}</span><i class="zone" style="bottom:${(proc.ideal.dist[0] / stickRange().max * 100).toFixed(1)}%;height:${((proc.ideal.dist[1] - proc.ideal.dist[0]) / stickRange().max * 100).toFixed(1)}%"></i><b class="knob"></b><small>المس لتبدأ • أعلى = أبعد</small></div>
+        ${state.level !== 'beg' ? `<div id="stick-l" class="stick ${proc.angle !== false ? 'xy lxy' : 'h'}"><span class="cap">الحركة على الخط${proc.angle !== false ? ' + ' + (proc.angleShort || 'زاوية التقدّم') : ''}</span><i class="rail"></i><b class="knob"></b><small class="lr"><span>رجوع</span><span>تقدّم</span></small>${proc.angle !== false ? '<small class="ud">↕ الزاوية</small>' : ''}</div>` : `<div class="stick-note">المستوى المبتدئ: الأداة تتحرك وحدها بالسرعة الصحيحة.<br>تحكّم أنت في ${proc.distName}.</div>`}
+        <div id="stick-r" class="stick xy"><span class="cap">${proc.distName}${state.workIdeal != null && state.level !== 'beg' ? ' + زاوية العمل ↔' : ''}</span><i class="zone" style="bottom:${(proc.ideal.dist[0] / stickRange().max * 100).toFixed(1)}%;height:${((proc.ideal.dist[1] - proc.ideal.dist[0]) / stickRange().max * 100).toFixed(1)}%"></i><b class="knob"></b><small>المس لتبدأ • أعلى = أبعد</small></div>
       </div>` : ''}
       ${proc.aux && !(state.level === 'beg') && !(state.level === 'mid' && proc.fillerLen) ? `<button type="button" class="aux-btn ${state.control === 'sticks' ? 'near-l' : ''}" id="aux-btn">${proc.aux.icon || ICON.plus}<span>${proc.aux.label}</span><small>${proc.aux.hint || 'اضغط واستمر'}</small></button>` : ''}
       <div class="weld-bottom">
         <div class="prog"><span>${proc.kind === 'cut' ? 'تقدّم القطع' : 'تقدّم الخط'}</span><div class="bar"><i id="prog-i"></i></div><b class="mono" id="prog-v">0%</b></div>
         ${proc.consumable ? `<div class="elec"><span>${proc.consumable.name}</span><div class="bar"><i id="elec-i"></i></div><b class="mono" id="elec-v"></b></div>` : proc.heatNeed ? `<div class="elec"><span>التسخين</span><div class="bar heat"><i id="heat-i"></i></div><b class="mono" id="heat-v"></b></div>` : ''}
-        <div class="hint">${state.control === 'sticks' ? 'الإبهام الأيمن على اللوحة اليمنى يشعل القوس ويتحكم في ' + proc.distName + '؛ اجعل النقطة داخل المنطقة الخضراء. والإبهام الأيسر يحرّك الأداة على الخط.' : state.control === 'rel' ? 'المس أي مكان واسحب: يمينًا ويسارًا = الحركة على الخط، وأعلى وأسفل = ' + proc.distName + '. إصبعك لن يغطي العمل.' : proc.hint}</div>
+        <div class="hint">${state.control === 'sticks' ? 'الإبهام الأيمن يشعل القوس: لأعلى وأسفل = ' + proc.distName + (state.workIdeal != null && state.level !== 'beg' ? '، ويمينًا ويسارًا = زاوية العمل بين اللوحين' : '') + '. والإبهام الأيسر: يمينًا ويسارًا = الحركة على الخط' + (proc.angle !== false && state.level !== 'beg' ? '، ولأعلى وأسفل = زاوية الميل في اتجاه السير' : '') + '. الزاوية تتغير من مكان لمس إصبعك، فلا تقفز.' : state.control === 'rel' ? 'المس أي مكان واسحب: يمينًا ويسارًا = الحركة على الخط، وأعلى وأسفل = ' + proc.distName + '. إصبعك لن يغطي العمل.' : proc.hint}</div>
       </div>`;
     const a = $('#angle');
-    if (a) a.addEventListener('input', () => { state.angle = +a.value; $('#angle-v').textContent = state.angle + '°'; });
+    if (a) a.addEventListener('input', () => { state.angle = +a.value; state.angleF = state.angle; $('#angle-v').textContent = state.angle + '°'; });
     const wk = $('#work');
-    if (wk) wk.addEventListener('input', () => { state.work = +wk.value; $('#work-v').textContent = state.work + '°'; });
+    if (wk) wk.addEventListener('input', () => { state.work = +wk.value; state.workF = state.work; $('#work-v').textContent = state.work + '°'; });
     const ab = $('#aux-btn');
     if (ab) {
       const on = e => { e.preventDefault(); state.weld.aux = true; state.weld.auxHeld = true; ab.classList.add('on'); audio.ensure(); };
@@ -913,6 +1040,7 @@ export function startApp(STATIONS) {
     if ((hudT += 1) % 3) return;
     const s = S(), proc = sim.proc, w = state.weld;
     s.hud(ctx).forEach(g => { const r = g.get(out); if (r) gauge(g.id, r.val, r.txt, r.min, r.max, r.lo, r.hi); });
+    if (state.workIdeal != null) gauge('work', state.work || 0, (state.work || 0) + '°', -30, 30, state.workIdeal - 4, state.workIdeal + 4);
     const pi = $('#prog-i'); if (pi) { pi.style.width = (out.progress * 100) + '%'; $('#prog-v').textContent = Math.round(out.progress * 100) + '%'; }
     const ei = $('#elec-i'); if (ei && proc.consumable) { const c = proc.consumable; ei.style.width = ((out.consumable - c.min) / (c.len - c.min) * 100) + '%'; $('#elec-v').textContent = Math.round(out.consumable * 1000) + ' mm'; }
     const hi = $('#heat-i'); if (hi) { const k = THREE.MathUtils.clamp(out.heat || 0, 0, 1.2); hi.style.width = Math.min(100, k * 100) + '%'; hi.dataset.ok = k >= 1 ? '1' : ''; $('#heat-v').textContent = k >= 1 ? 'جاهز' : Math.round(k * 100) + '%'; }
@@ -938,6 +1066,18 @@ export function startApp(STATIONS) {
       const R = state.report; R.total = Math.max(0, R.total - 8); R.grade = R.total >= 90 ? 'ممتاز' : R.total >= 75 ? 'جيد جداً' : R.total >= 60 ? 'جيد' : R.total >= 50 ? 'مقبول' : 'يحتاج إلى تدريب';
       R.defects.unshift({ name: 'مسامية بسبب سطح غير نظيف', en: 'Porosity (dirty surface)', cause: 'لم تُنظَّف حواف الوصلة من الصدأ والزيوت قبل اللحام.', fix: 'نظّف مكان اللحام بالفرشاة السلكية حتى يظهر المعدن لامعًا قبل أن تبدأ.', spots: [{ x0: JOINT.x0 + 0.004, x1: JOINT.x0 + (JOINT.x1 - JOINT.x0) * Math.min(1, R.coverage) - 0.004, all: true }] });
       R.crit.push({ label: 'تنظيف السطح', v: Math.round(state.prep.clean * 100) });
+    }
+    { // fit-up quality: oversized tacks stand proud under the bead; tacking the middle first lets the gap close
+      const fx = fitup.st, R = state.report;
+      if (sim.proc.kind !== 'cut' && fx.tackQ && fx.tackQ.some(q => q === 'big')) {
+        R.total = Math.max(0, R.total - 3);
+        R.defects.push({ name: 'نقاط تكميل كبيرة', en: 'Oversized tack welds', cause: 'استمر القوس طويلًا عند التنقيط، فتكوّنت نقاط كبيرة بارزة يصعب أن ينصهر الخط فوقها.', fix: 'النقطة الجيدة صغيرة: قوس قصير لمدة ثانية إلى ثانيتين فقط عند كل نقطة.', spots: fx.tackQ.map((q, i) => q === 'big' ? { x0: TACK_X()[i] - 0.004, x1: TACK_X()[i] + 0.004 } : null).filter(Boolean) });
+      }
+      if (sim.proc.kind !== 'cut' && fx.tackOrder === false) {
+        R.total = Math.max(0, R.total - 2);
+        R.defects.push({ name: 'ترتيب تنقيط غير صحيح', en: 'Wrong tack sequence', cause: 'بدأت التنقيط بالمنتصف، فتتحرك القطعتان وتتغير الفتحة بينهما على طول الوصلة.', fix: 'نقّط الطرف الأول ثم الطرف الثاني ثم المنتصف.', all: true, spots: [{ x0: JOINT.x0 + 0.004, x1: JOINT.x1 - 0.004, all: true }] });
+      }
+      R.grade = R.total >= 90 ? 'ممتاز' : R.total >= 75 ? 'جيد جداً' : R.total >= 60 ? 'جيد' : R.total >= 50 ? 'مقبول' : 'يحتاج إلى تدريب';
     }
     markDone('weld');
     const s = S(), at = store.get('attempts.' + s.id, []), d = new Date();
@@ -972,6 +1112,9 @@ export function startApp(STATIONS) {
     else if (a === 'pad-reset') { PADS.forEach(id => store.set('pad.' + id, null)); store.set('padScale', 1); renderHUD(); }
     else if (a && a.startsWith('level:')) { state.level = a.slice(6); store.set('level', state.level); state.assist = state.level !== 'adv'; setAssist(state.assist); renderHUD(); showToast('info', LEVEL_TIP[state.level]); }
     else if (a === 'assist') { state.assist = !state.assist; setAssist(state.assist); renderHUD(); }
+    else if (a === 'weld-opts') { state.optsOpen = !state.optsOpen; renderHUD(); }
+    else if (a && a.startsWith('weave:')) { state.weave = a.slice(6); sim.weave = state.weave; renderHUD(); showToast('info', state.weave === 'none' ? 'حركة مستقيمة (Stringer): مناسبة للمسطح والأفقي والصاج الرقيق.' : state.weave === 'tri' ? 'حركة المثلث: من حافة لحافة مع توقف لحظة عند كل حافة، وتقدّم ٢–٣ مم كل دورة. الأفضل للرأسي الصاعد.' : 'حركة الزجزاج: تذبذب منتظم يعرّض الخط. أبطئ التقدّم قليلًا.'); }
+    else if (a && a.startsWith('sens:')) { state.sens = a.slice(5); store.set('sens', state.sens); renderHUD(); showToast('info', 'حساسية اليد: ' + SENS[state.sens].name + (state.sens === 'low' ? ' — حركة هادئة مناسبة للمبتدئ.' : state.sens === 'high' ? ' — حركة سريعة مثل اليد الحقيقية.' : '.')); }
     else if (a === 'new-consumable') { sim.consumable = sim.proc.consumable.len; showToast('info', sim.proc.consumable.newMsg); }
     else if (a === 'finish') finishWeld();
     else if (a === 'slag') { if (sim.startSlagRemoval()) { showToast('info', 'جارٍ تكسير الخبث بالمطرقة…'); [0, 180, 360, 540, 720, 900].forEach(d => setTimeout(() => audio.sfx('chip'), d)); } }
@@ -981,7 +1124,7 @@ export function startApp(STATIONS) {
       const sid = state.station, exx = fitup.cur(sid); if (fitup.POS[exx.pos].lift > 0 || exx.pos === '1F') { showToast('info', 'معاينة الوضع: ' + fitup.POS[exx.pos].name); setTimeout(() => state.stage === 'fitup' && fitup.cur(sid) === exx && !fitup.st.done && !state.fitBusy && fitup.mount(sid, true, () => setTimeout(() => state.stage === 'fitup' && !fitup.st.done && fitup.unmount(sid, true), 1400)), 900); } }
     else if (a === 'fit-clean') { state.fitBusy = true; fitup.unmount(state.station, false); clean.start('pre'); renderClean(); const c = cleanCamera(); E.flyTo(c.pos, c.target, 0.8); }
     else if (a && a.startsWith('tack:')) doTack(+a.slice(5));
-    else if (a === 'fit-mount') { fitup.st.done = true; fitup.mount(state.station, true, () => { fitup.st.done = true; renderPanel(); showToast('good', 'القطعة مثبتة في وضع ' + fitup.POS[fitup.cur(state.station).pos].name + '. اضبط الماكينة ثم ابدأ اللحام.'); E.controls.maxPolarAngle = 2.7; const c = weldCamera(); E.flyTo(c.pos.clone().lerp(c.target, -0.35), c.target, 1.0); }); }
+    else if (a === 'fit-mount') { fitup.st.done = true; fitup.mount(state.station, true, () => { fitup.st.done = true; renderPanel(); showToast('good', 'القطعة مثبتة في وضع ' + fitup.POS[fitup.cur(state.station).pos].name + '. الآن ابدأ اللحام.'); E.controls.maxPolarAngle = 2.7; const c = weldCamera(); E.flyTo(c.pos.clone().lerp(c.target, -0.35), c.target, 1.0); }); }
     else if (a === 'def-focus') { focusDefect(+el.dataset.i, +(el.dataset.j || 0)); }
     else if (a === 'def-close') { $('#defcard').hidden = true; }
     else if (a === 'defects') { state.showDef = !state.showDef; showDefects(state.showDef); renderPanel(); }
@@ -1019,8 +1162,8 @@ export function startApp(STATIONS) {
 
   // ---------------------------------------------------------------- loop & boot
   E.onFrame(dt => {
-    holdFrame(dt); clean && clean.frame(dt);
-    { const st = S(); E.always = state.stage === 'weld' || !!hold || !!(clean && clean.active) || state.stage === 'wear' || !!(st && st.animating && st.animating(ctx)) || explodeK > 0 && explodeK < 1;
+    holdFrame(dt); clean && clean.frame(dt); tackFrame(dt);
+    { const st = S(); E.always = state.stage === 'weld' || !!hold || !!tack || !!(clean && clean.active) || state.stage === 'wear' || !!(st && st.animating && st.animating(ctx)) || explodeK > 0 && explodeK < 1;
       E.glow = state.stage === 'weld' || state.stage === 'inspect' || !!(st && st.animating && st.animating(ctx)); }
     const s = S();
     if (state.stage === 'weld') weldFrame(dt);

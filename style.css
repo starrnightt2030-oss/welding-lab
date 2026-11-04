@@ -534,3 +534,35 @@ body.sticks-mode .work-ctl{bottom:auto;top:4.6rem}
 #upd-ok span{font-size:.8rem;opacity:.85}
 @keyframes updIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 #upd-ok{animation-name:updOk}@keyframes updOk{from{opacity:0;bottom:0}to{opacity:1}}
+.tackpt{touch-action:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.tackpt.off{opacity:.45;animation:none;filter:grayscale(.6)}
+.tackpt:active{background:rgba(190,225,255,.55);border-color:#e8f4ff;box-shadow:0 0 18px 8px rgba(160,210,255,.55)}
+/* left pad: travel (↔) + travel angle (↕) */
+.stick.lxy{width:calc(min(15rem,34vw) * var(--pad,1));height:calc(min(10rem,34vh) * var(--pad,1))}
+.stick.lxy .rail{position:absolute;left:8%;right:8%;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:linear-gradient(90deg,#e4232a,#3a4a6a 45%,#3a4a6a 55%,#3ddc97)}
+.stick.lxy::after{content:"";position:absolute;top:12%;bottom:12%;left:50%;width:2px;margin-left:-1px;background:rgba(255,184,77,.35);border-radius:1px}
+.stick small.ud{left:auto;right:.45rem;top:50%;bottom:auto;transform:translateY(-50%);width:auto;color:#ffb84d;font-weight:600}
+.lvl.sens span{font-size:.72rem;color:#9fb2d0;padding:0 .4rem;align-self:center}
+@media (max-height:540px){.stick.lxy{height:calc(min(8rem,40vh) * var(--pad,1))}}
+.lvl.weave span{font-size:.72rem;color:#9fb2d0;padding:0 .4rem;align-self:center}
+/* macro section */
+.xsec .bg{fill:#0d1424}
+.xsec .pl{fill:#7d858e}.xsec .plh{fill:url(#xs-h)}
+.xsec .haz{fill:none;stroke:#a6977d;stroke-width:9;stroke-linejoin:round;opacity:.55}
+.xsec .wm2{fill:#c9b48b;stroke:#efe0bd;stroke-width:1}
+.xsec .gr{stroke:rgba(90,70,40,.35);stroke-width:1.2}
+.xsec .pore{fill:#141a26;stroke:#e9d9b4;stroke-width:1}
+.xsec .lof{stroke:#ff4d57;stroke-width:3;stroke-linecap:round}
+.xsec .cut{fill:#0d1424;stroke:#ff8a3d;stroke-width:1.5}
+.xsec .dim{stroke:var(--arc);stroke-width:1.5;fill:none}.xsec .dim.thr{stroke-dasharray:4 3}
+.xsec text{fill:#C9DCEB;font-size:14px;font-weight:600;paint-order:stroke;stroke:#0d1424;stroke-width:3px;font-family:"IBM Plex Sans Arabic",sans-serif}
+.xsec text.ok{fill:#3ddc97}.xsec text.bad{fill:#ff8a8f}
+.xs-leg{display:flex;flex-wrap:wrap;gap:.35rem .8rem;margin-top:.4rem;font-size:.74rem;color:var(--text2)}
+.xs-leg i{display:inline-block;width:.8rem;height:.8rem;border-radius:.2rem;margin-inline-end:.3rem;vertical-align:-.1rem}
+.xs-leg .k-pl{background:#7d858e}.xs-leg .k-haz{background:#a6977d}.xs-leg .k-wm{background:#c9b48b}.xs-leg .k-po{background:#141a26;border:1px solid #e9d9b4}.xs-leg .k-lf{background:#ff4d57}.xs-leg .k-uc{background:#ff8a3d}
+body.sticks-mode .work-ctl{display:none}
+.weld-opts{position:absolute;z-index:8;top:8.6rem;left:max(.6rem,env(safe-area-inset-left));width:min(22rem,60vw);display:flex;flex-direction:column;gap:.45rem;padding:.8rem;border-radius:1rem;direction:rtl}
+.weld-opts b{font-size:.82rem;color:#dfe9ff}.weld-opts small{font-size:.72rem;color:#9fb2d0;line-height:1.5}
+.weld-opts .lvl{align-self:flex-start}.weld-opts .btn{align-self:flex-start}
+@media (max-height:540px){.weld-opts{top:7.6rem;max-height:calc(100vh - 9rem);overflow:auto}}
+.xsec{direction:ltr}

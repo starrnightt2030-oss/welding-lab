@@ -45,12 +45,12 @@ const SETS = {
 const FAMILY = { smaw: 'arc', mig: 'arc', co2: 'arc', caw: 'gas', tig: 'thin', oaw: 'gas' };
 const POS_TIP = {
   '1G': 'الوضع المسطح هو الأسهل: حافظ على السرعة وطول القوس.',
-  '2G': 'في الوضع الأفقي يميل المعدن المنصهر إلى النزول: أمِل الأداة ١٠–١٥° لأعلى، وقلّل الحرارة قليلًا، وزِد السرعة.',
-  '3G': 'في الوضع الرأسي الصاعد: قلّل التيار ١٠–١٥٪، واصعد بحركة صغيرة منتظمة، ولا تتأخر وإلا تدلّى المعدن.',
+  '2G': 'في الوضع الأفقي يميل المعدن المنصهر إلى النزول: امشِ بخط مستقيم بلا تذبذب، وأمِل الأداة ١٠–١٥° لأعلى، وقلّل الحرارة قليلًا، وزِد السرعة.',
+  '3G': 'في الوضع الرأسي الصاعد: قلّل التيار ١٠–١٥٪، واختر حركة «المثلث» من حافة لحافة، واصعد ٢–٣ مم في كل دورة، ولا تتأخر وإلا تدلّى المعدن.',
   '4G': 'فوق الرأس: قوس قصير جدًا، وحرارة أقل، وحركة سريعة ثابتة حتى لا يتساقط المعدن.',
   '1F': 'وصلة الزاوية في الوضع المسطح: وجّه الأداة على منتصف الزاوية.',
   '2F': 'وصلة الزاوية الأفقية: وجّه الأداة على منتصف الزاوية، ومِل قليلًا نحو اللوح السميك.',
-  '3F': 'وصلة الزاوية الرأسية: قلّل التيار واصعد ببطء منتظم، ووزّع الحرارة على اللوحين.',
+  '3F': 'وصلة الزاوية الرأسية: قلّل التيار، واستخدم حركة «المثلث» لتوزيع الحرارة على اللوحين، واصعد ببطء منتظم.',
   '4F': 'وصلة الزاوية فوق الرأس: قوس قصير وحرارة أقل وسرعة ثابتة.'
 };
 
@@ -119,7 +119,7 @@ export function createFitup({ E, audio, toast, say, onMounted }) {
     posFrame, jointFrame, fixture, POS, JOINT_NAME, POS_TIP,
     list, cur, st, apply, mount, unmount, W, flat, gravityLocal,
     plateOpts: sid => { const e = cur(sid); return { kind: e.kind, t: MM(e.t), t2: MM(e.t2) }; },
-    select(sid, id) { st.byStation[sid] = id; st.done = false; st.tacks = [false, false, false]; st.cleaned = 0; st.cleanDone = false; st.mounted = false; st.k = 0; },
-    reset() { st.done = false; st.tacks = [false, false, false]; st.cleaned = 0; st.cleanDone = false; }
+    select(sid, id) { st.byStation[sid] = id; st.done = false; st.tacks = [false, false, false]; st.tackQ = [null, null, null]; st.tackOrder = true; st.cleaned = 0; st.cleanDone = false; st.mounted = false; st.k = 0; },
+    reset() { st.done = false; st.tacks = [false, false, false]; st.tackQ = [null, null, null]; st.tackOrder = true; st.cleaned = 0; st.cleanDone = false; }
   };
 }

@@ -146,7 +146,7 @@ export function buildPlates(M, opts = {}) {
     const tackMat = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8 });
     [0.205, 0.395].forEach(x => {
       const t = mesh(new THREE.SphereGeometry(0.006, 16, 10), tackMat);
-      t.scale.set(1.3, 0.35 * Math.max(0.6, T / 0.006), 0.9); t.position.set(x, JOINT.y + 0.0006, JOINT.z); g.add(t);
+      t.scale.set(1.3, 0.35 * Math.max(0.6, T / 0.006), 0.9); t.position.set(x, JOINT.y + 0.0006, JOINT.z); t.userData.tack0 = true; g.add(t);
     });
   } else {
     const a = mesh(new THREE.BoxGeometry(L, T, Wd * 2), mats); a.position.set(0.3, TABLE_Y + R + T / 2, JOINT.z);
@@ -164,7 +164,7 @@ function buildJointPlates(M, o) {
   JOINT.surf = null;
   const g = new THREE.Group(), mat = M.plate, edge = M.plateEdge;
   const tackMat = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.55, metalness: 0.8 });
-  const tack = (x, y, z, s) => { const t = mesh(new THREE.SphereGeometry(0.0055, 14, 10), tackMat); t.scale.set(1.3, s, s); t.position.set(x, y, z); g.add(t); return t; };
+  const tack = (x, y, z, s) => { const t = mesh(new THREE.SphereGeometry(0.0055, 14, 10), tackMat); t.scale.set(1.3, s, s); t.position.set(x, y, z); t.userData.tack0 = true; g.add(t); return t; };
   if (kind === 'butt') {            // thin plate (z < Z) + thick plate tapered down to the thin thickness at the joint
     const gap = 0.0016, thin = Math.min(t1, t2), thick = Math.max(t1, t2), taper = (thick - thin) * 4;
     g.add(profilePlate([[Z - gap / 2 - 0.08, Y0], [Z - gap / 2, Y0], [Z - gap / 2, Y0 + thin], [Z - gap / 2 - 0.08, Y0 + thin]], L, mat));

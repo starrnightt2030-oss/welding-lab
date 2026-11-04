@@ -8,6 +8,16 @@ import { AR } from '../data.js';
 const MAX_RIPPLES = 1000;
 const MAX_SPARKS = 320;
 const HEAT_BIN = 0.002;
+// weaving (side-to-side torch motion). k: how much slower the travel is for the same heat; wide: bead width factor
+export const WEAVE = {
+  none: { name: 'مستقيم', k: 1, wide: 1, f: 0 },
+  zig: { name: 'زجزاج', k: 0.62, wide: 1.85, f: 1.6 },
+  tri: { name: 'مثلث', k: 0.55, wide: 2.0, f: 1.3 }
+};
+const weaveShape = (pat, ph) => {
+  if (pat === 'zig') return Math.sin(ph * Math.PI * 2);
+  const u = ph - Math.floor(ph), t = u < 0.5 ? 4 * u - 1 : 3 - 4 * u; return THREE.MathUtils.clamp(t * 1.3, -1, 1);   // triangle with a short dwell at each toe
+};
 
 export class WeldSim {
   constructor(scene) {
@@ -67,7 +77,7 @@ export class WeldSim {
   configure(proc, settings) { this.proc = proc; this.settings = settings; this.reset(); }
 
   reset() {
-    this._sag = 0;
+    this._sag = 0; this.wPh = 0; this.weaveZ = 0; this.weaveA = 0.0025; this.weave = this.weave || 'none';
     const p = this.proc;
     this.ripples = []; this.samples = [];
     this.events = { stuck: 0, outs: 0, strikes: 0, lost: 0, early: 0 };
@@ -110,7 +120,8 @@ export class WeldSim {
     const x = THREE.MathUtils.clamp(input.x, JOINT.x0 - 0.03, JOINT.x1 + 0.01); this._work = input.work || 0;
     this.trackEvents(x); this.lastInX = x;
     const d = input.dist;
-    const sNow = { speed: this.speed, dist: d, angle: input.angle, aux: !!input.aux, settings: this.settings, heat: this.heatAt(x) };
+    const WV = WEAVE[this.weave] || WEAVE.none;
+    const sNow = { speed: this.speed / WV.k, dist: d, angle: input.angle, aux: !!input.aux, settings: this.settings, heat: this.heatAt(x) };
     // cool down everything
     for (let i = 0; i < this.heat.length; i++) this.heat[i] *= Math.pow(0.55, dt);
 
@@ -139,6 +150,7 @@ export class WeldSim {
     }
     if (!this.on) this.speedEMA *= 0.9;
 
+    if (this.on && WV.f) { this.wPh += dt * WV.f; this.weaveZ = this.weaveA * weaveShape(this.weave, this.wPh); } else this.weaveZ *= Math.pow(0.001, dt);
     if (this.on) {
       // heat input at the torch
       this.addHeat(x, (p.heatRate ? p.heatRate(sNow) : 1) * dt);
@@ -163,7 +175,7 @@ export class WeldSim {
       if (depositing && x > this.progress - 0.0005) {
         while (this.progress <= Math.min(x, JOINT.x1)) { this.addRipple(this.progress, sNow); this.progress += p.spacing || 0.0011; }
       }
-      this.samples.push({ x, t: this.time, speed: this.speed, dist: d, angle: input.angle, work: input.work || 0, aux: !!input.aux, dep: depositing, heat: this.heatAt(x) });
+      this.samples.push({ x, t: this.time, speed: this.speed / WV.k, raw: this.speed, wv: this.weave, dist: d, angle: input.angle, work: input.work || 0, aux: !!input.aux, dep: depositing, heat: this.heatAt(x) });
 
       const rate = p.sparks ? p.sparks(sNow) : 60;
       this.emitSparks(Math.round(rate * dt + Math.random() * 0.5), x, JOINT.y, p.sparkDir);
@@ -171,24 +183,24 @@ export class WeldSim {
 
       const flick = 0.75 + Math.random() * 0.5;
       const len = d / 1000;
-      this.light.position.set(x, JOINT.y + len * 0.6 + 0.004, JOINT.z);
+      this.light.position.set(x, JOINT.y + len * 0.6 + 0.004, JOINT.z + this.weaveZ);
       this.light.intensity = (p.lightIntensity ?? 0.35) * flick;
       if (p.kind === 'arc') {
-        this.sprite.position.set(x, JOINT.y + len * 0.5, JOINT.z);
+        this.sprite.position.set(x, JOINT.y + len * 0.5, JOINT.z + this.weaveZ);
         this.sprite.scale.setScalar(((p.arcSize ?? 0.035) + d * 0.006) * flick);
-        this.core.position.set(x, JOINT.y + len * 0.5, JOINT.z);
+        this.core.position.set(x, JOINT.y + len * 0.5, JOINT.z + this.weaveZ);
         this.core.scale.set(1, Math.max(0.6, d / 3), 1);
       }
       const pw = (p.poolMM ? p.poolMM(sNow) : 5) / 1000;
       this.pool.visible = heatOK;
-      this.pool.position.set(x - 0.0008, JOINT.y + (p.kind === 'cut' ? 0.0003 : 0.0016), JOINT.z);
+      this.pool.position.set(x - 0.0008, JOINT.y + (p.kind === 'cut' ? 0.0003 : 0.0016), JOINT.z + this.weaveZ * 0.6);
       this.pool.scale.set(pw * 0.65, pw * 0.5, 1);
       out.heat = this.heatAt(x) / (p.heatNeed || 1);
     }
 
     this.updateRipples(dt); this.updateSparks(dt); this.updateSmoke(dt);
     out.on = this.on;
-    out.speed = this.speed;
+    out.speed = this.speed / (WEAVE[this.weave] || WEAVE.none).k;   // with a weave the travel is slower on purpose: show the equivalent speed
     out.progress = (Math.min(this.progress, JOINT.x1) - JOINT.x0) / (JOINT.x1 - JOINT.x0);
     out.consumable = this.consumable;
     return out;
@@ -199,22 +211,27 @@ export class WeldSim {
     const p = this.proc;
     const dims = p.dims(s);
     let w = dims.w / 1000, h = dims.h / 1000;
+    const WV = p.kind === 'cut' ? WEAVE.none : (WEAVE[this.weave] || WEAVE.none);
+    this.weaveA = w * 0.5 * (WV.wide - 1) + 0.0008;
+    if (WV.f) { w *= WV.wide; h *= 0.74; }   // weaving spreads the same metal over a wider, flatter bead
     const wob = (Math.random() - 0.5) * 0.0004 * (dims.wobble ?? 1);
     let zOff = 0, hk = 1;
     const ex = this.exercise, g = this.gLocal, id0 = p.ideal;
     if (ex && g && p.kind !== 'cut' && id0) {
       // molten metal flows with gravity when the pool is too hot/slow for the position
       const slow = THREE.MathUtils.clamp(((id0.speed[0] + id0.speed[1]) / 2) / Math.max(0.5, s.speed) - 0.85, 0, 2.5);
-      this._sag = (this._sag ?? 0) * 0.85 + slow * 0.15;   // the pool sags gradually, not in steps
+      // weaving lets each toe freeze before the next pass: much less sag going vertical-up; on a horizontal (2G) joint it makes a bigger pool that runs down
+      const wvK = !WV.f ? 1 : Math.abs(g.x) > 0.6 ? 0.4 : Math.abs(g.z) > 0.6 ? 1.7 : 1;
+      this._sag = (this._sag ?? 0) * 0.85 + slow * wvK * 0.15;   // the pool sags gradually, not in steps
       zOff += g.z * this._sag * w * 0.35; hk *= 1 + Math.max(0, g.y) * this._sag * 0.35;
-      if (Math.abs(g.x) > 0.6 && slow > 0.4 && Math.random() < 0.35) this.addRoll(x, JOINT.z, w, h * (1 + slow * 0.4));   // vertical: sagging laps
+      if (Math.abs(g.x) > 0.6 && slow * wvK > 0.4 && Math.random() < 0.35) this.addRoll(x, JOINT.z, w, h * (1 + slow * 0.4));   // vertical: sagging laps
       if (g.y > 0.6 && slow > 0.3 && Math.random() < 0.3) this.addRoll(x, JOINT.z + (Math.random() - 0.5) * w * 0.4, w * 0.3, h * 1.6);   // overhead: drops
     }
     if (ex && ex.work != null) zOff += Math.sin(THREE.MathUtils.degToRad(this._work || 0)) * w * 0.5;
     // fillet (tee / lap): the bead sits in a 90° corner, so it must fill the corner and stand proud of both faces
     let wk = 1;
     if (ex && (ex.kind === 'tee' || ex.kind === 'lap') && p.kind !== 'cut') { h = Math.max(h * 1.15, w * 0.68) + h * 0.25; wk = 1.15; }
-    const r = { x, w: w * wk, h: h * hk, z: JOINT.z + wob + zOff, born: this.time, s: { speed: s.speed, dist: s.dist, angle: s.angle, aux: s.aux } };
+    const r = { x, w: w * wk, h: h * hk, z: JOINT.z + wob + zOff + (WV.f ? this.weaveZ * 0.25 : 0), born: this.time, s: { speed: s.speed, dist: s.dist, angle: s.angle, aux: s.aux } };
     this.ripples.push(r);
     const i = this.ripples.length - 1;
     if (p.kind === 'cut') {
@@ -493,7 +510,7 @@ export class WeldSim {
       if (!b.n) { b.state = 'none'; return; }
       b.sp /= b.n; b.dist /= b.n; b.aux /= b.n;
       const is = [];
-      if (b.sp > id.speed[1] * 1.25) is.push('fast'); if (b.sp < id.speed[0] * 0.7) is.push('slow');
+      if (b.sp > id.speed[1] * 1.25) is.push('fast'); if (b.sp < id.speed[0] * 0.7 && b.i > 0 && b.i < nb - 1) is.push('slow');   // the arc start and the crater fill at the end are slow on purpose
       if (b.dist > id.dist[1] * 1.12) is.push('long'); if (b.dist < id.dist[0] * 0.85) is.push('short');
       if (p.fillerLen && b.aux < 0.15) is.push('nofill');
       b.issues = is; b.state = is.length ? (is.length > 1 ? 'bad' : 'warn') : 'good';
@@ -516,6 +533,19 @@ export class WeldSim {
         else if (ex.work > 0 && err < -3) defects.push({ name: 'انصهار ناقص في اللوح الأسمك', en: 'Insufficient fusion (thick side)', cause: 'اللوح الأسمك يحتاج حرارة أكثر، والأداة لم تمل نحوه بالقدر الكافي.', fix: 'زِد زاوية العمل نحو اللوح الأسمك إلى حوالي ' + AR(ex.work) + '°.', all });
         const wsc = Math.round(THREE.MathUtils.clamp(100 - Math.abs(err) * 5, 0, 100)); crit.push({ label: 'زاوية العمل', v: wsc }); total = Math.round(total * 0.88 + wsc * 0.12);
       }
+      // ---- torch motion: weaving where the position / thickness needs it, straight stringer beads where it does not
+      const thin = Math.min(ex.t, ex.t2 ?? ex.t) <= 3, need = (P === '3G' || P === '3F') && !thin ? 'weave' : (P === '2G' || thin) ? 'stringer' : 'any';
+      const wvN = S.filter(q => q.wv && q.wv !== 'none'), frac = wvN.length / Math.max(1, S.length), tri = wvN.filter(q => q.wv === 'tri').length / Math.max(1, wvN.length);
+      let msc = 100;
+      if (need === 'weave' && frac < 0.5) { msc = 55; defects.push({ name: 'خط ضيق بلا حركة تذبذب', en: 'No weave (vertical-up)', cause: 'في الوضع الرأسي الصاعد لسُمك ' + AR(Math.max(ex.t, ex.t2 ?? ex.t)) + ' مم مشيت بخط مستقيم، فخرج الخط ضيقًا محدّبًا ولم تنصهر الحافتان جيدًا، والبركة معرّضة للتدلّي.', fix: 'اختر حركة «المثلث»: تحرّك من حافة لحافة، وتوقف لحظة عند كل حافة، واصعد خطوة صغيرة (٢–٣ مم) في كل دورة.', all: true }); }
+      else if (need === 'weave' && tri < 0.5) msc = 85;
+      if (need === 'stringer' && frac > 0.5) { msc = 60; defects.push(P === '2G' ? { name: 'تذبذب في الوضع الأفقي', en: 'Weaving in 2G', cause: 'حركة التذبذب في الوضع الأفقي تكبّر البركة فيسيل المعدن إلى أسفل وتتآكل الحافة العلوية.', fix: 'في الأفقي استخدم خطوطًا مستقيمة متتالية (Stringer) مع ميل الأداة قليلًا لأعلى.', all: true } : { name: 'تذبذب على صاج رقيق', en: 'Weaving on thin sheet', cause: 'التذبذب على صاج رقيق يزيد الحرارة والعرض، فيتشوّه الصاج وقد يُثقب.', fix: 'على الصاج الرقيق امشِ بخط مستقيم وبسرعة ثابتة.', all: true }); }
+      if (frac > 0.5) {   // pitch: how far the torch climbs per weave cycle (2–4 mm is right)
+        const f = (WEAVE[wvN[0].wv] || WEAVE.zig).f, raw = wvN.filter(q => q.raw > 0.2).map(q => q.raw), pitch = raw.length ? raw.reduce((a, c) => a + c, 0) / raw.length / f : 0;
+        if (pitch > 5) { msc = Math.min(msc, 65); defects.push({ name: 'تذبذب مع تقدّم سريع', en: 'Weave pitch too long', cause: 'تقدّمت ' + AR(pitch.toFixed(1)) + ' مم في كل دورة تذبذب، فظهرت تموجات متباعدة وفجوات عند الحواف.', fix: 'اجعل التقدّم ٢–٤ مم فقط في كل دورة: أبطئ قليلًا مع التذبذب.', all: true }); }
+        else if (pitch > 0 && pitch < 1.2) { msc = Math.min(msc, 75); defects.push({ name: 'تذبذب بطيء جدًا', en: 'Weave pitch too short', cause: 'التذبذب في مكانه تقريبًا، فتراكمت الحرارة وكبرت البركة.', fix: 'تقدّم بثبات ٢–٤ مم في كل دورة.', all: true }); }
+      }
+      if (need !== 'any' || frac > 0.5) { crit.push({ label: 'طريقة الحركة', v: msc }); total = Math.round(total * 0.9 + msc * 0.1); }
     }
     const spanAll = { x0: JOINT.x0 + 0.004, x1: JOINT.x0 + (JOINT.x1 - JOINT.x0) * Math.min(1, coverage) - 0.004, all: true };
     defects.forEach(d => { if (!d.spots) d.spots = d.all ? [spanAll] : d._k ? this.localize({ en: d._k === 'slow' ? 'Overlap' : 'Spatter' }, bins, coverage) : this.localize(d, bins, coverage); });
