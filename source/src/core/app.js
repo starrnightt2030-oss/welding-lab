@@ -75,7 +75,7 @@ export function startApp(STATIONS) {
       S.root = new THREE.Group(); S.root.visible = false; E.scene.add(S.root);
       S.build(ctx);
     }
-    E.onResize = () => { applyViewOffset(); if (state.stage === 'weld' && !E.tweening()) { const c = weldCamera(); E.camera.position.copy(c.pos); E.controls.target.copy(c.target); } };
+    E.onResize = () => { applyViewOffset(); if (state.stage === 'weld' && !E.tweening()) { const c = weldCamera(tipPos.x); E.camera.position.copy(c.pos); E.controls.target.copy(c.target); camFollowOff = null; } };
   }
   function setPlates(opts) {
     // the chosen fit-up exercise decides the plates (except the single plate used for cutting)
@@ -122,6 +122,7 @@ export function startApp(STATIONS) {
   }
   function leaveStage() {
     const s = S(), prev = state.stage;
+    if (prev === 'fitup') tackToolOff();
     if (prev === 'weld') { audio.update(false); $('#lens').classList.remove('on'); E.renderer.toneMappingExposure = 1.12; sim.setVisible(false); s && s.weldExit && s.weldExit(ctx); }
     if (prev === 'explore' && explodeK > 0) resetExplode();
     if (assist) { assist.visible = false; assist.userData.ring.visible = false; }
@@ -207,10 +208,18 @@ export function startApp(STATIONS) {
   function renderAll() { renderTopbar(); renderPanel(); renderHotspots(); renderHUD(); applyViewOffset(); }
 
 
-  function weldCamera() {
+  // vertical joints (3G / 3F): the whole 17 cm joint does not fit the short side of a landscape screen,
+  // so the camera frames ~12 cm around the arc and FOLLOWS it up the joint (see followCam)
+  function jointVertical() { if (!fitup) return false; const ax = V3(1, 0, 0).transformDirection(fitup.W()); return Math.abs(ax.y) > 0.5; }
+  function weldCamera(atX) {
     const c = weldCameraLocal(); if (!fitup) return c;
     fitup.posFrame.updateMatrixWorld(true);
-    const W = fitup.W(), d = c.pos.distanceTo(c.target);
+    const W = fitup.W(), vert = jointVertical();
+    let d = c.pos.distanceTo(c.target);
+    if (vert) {
+      const vf = THREE.MathUtils.degToRad(E.camera.fov); d = Math.max(0.2, 0.065 / Math.tan(vf / 2));
+      c.target.x = THREE.MathUtils.clamp(atX ?? (JOINT.x0 + 0.03), JOINT.x0 + 0.03, JOINT.x1 - 0.045);
+    }
     const n = new THREE.Vector3(0, 1, 0).transformDirection(W);   // outward normal of the joint (bisector for fillets)
     c.target.applyMatrix4(W);
     let dir;
@@ -299,7 +308,30 @@ export function startApp(STATIONS) {
     audio.ensure(); if (state.lens !== false) { $('#lens').dataset.shade = tack.shade; $('#lens').classList.add('on'); }
     E.always = true;
   }
+  // the real tool (electrode holder / torch / gun) comes over the joint during the tack step and touches down for each tack
+  let tackTool = null;
+  function tackToolOn() {
+    if (tackTool) return; const s = S(), proc = s.weldProc(ctx);
+    state.weld = state.weld || { pressing: false, x: JOINT.x0, dist: 25, aux: false };
+    if (proc.consumable && !(sim.consumable > (proc.consumable.min || 0))) sim.consumable = proc.consumable.len;
+    if (proc.fillerLen && !sim.filler) sim.filler = proc.fillerLen;
+    s.weldEnter && s.weldEnter(ctx);
+    const i0 = [0, 1, 2].find(i => !fitup.st.tacks[i]) ?? 0;
+    tackTool = { tip: V3(TACK_X()[i0], JOINT.y + 0.06, JOINT.z), gap: ((proc.ideal.dist[0] + proc.ideal.dist[1]) / 2) / 1000 };
+  }
+  function tackToolOff() { if (!tackTool) return; tackTool = null; const s = S(); s && s.weldExit && s.weldExit(ctx); }
+  function tackToolFrame(dt) {
+    const fx = fitup && fitup.st, want = state.stage === 'fitup' && fx && fx.cleanDone && !fx.tacks.every(Boolean) && !isCutTask() && !clean.active && S().operateReady(ctx).ok;
+    if (!want && !tack) { tackToolOff(); return; }
+    tackToolOn();
+    const i = tack ? tack.i : ([0, 1, 2].find(k => !fx.tacks[k]) ?? 0);
+    const goal = V3(TACK_X()[i], JOINT.y + (tack ? tackTool.gap : 0.03), JOINT.z);
+    tackTool.tip.lerp(goal, 1 - Math.pow(tack ? 1e-5 : 0.004, dt));
+    S().weldPose(ctx, tackTool.tip, dt, {});
+    E.poke(200);
+  }
   function tackFrame(dt) {
+    tackToolFrame(dt);
     if (!tack) return;
     tack.t = (performance.now() - tack.t0) / 1000; const k = Math.min(1.7, tack.t / 1.1), fl = 0.7 + Math.random() * 0.6, v = tackVisual();
     tack.m.scale.set(1.3 * k, 0.5 * k, 0.95 * k);
@@ -647,6 +679,7 @@ export function startApp(STATIONS) {
     const target = V3(w.x, JOINT.y + (w.pressing && !sim.stuck ? Math.max(0.0003, d / 1000) : w.pressing ? 0.0002 : 0.025), JOINT.z + (sim.on ? sim.weaveZ : 0));
     if (!w.pressing && state.control === 'rel') target.x = Math.max(JOINT.x0 - 0.01, Math.min(sim.progress, JOINT.x1));
     tipPos.lerp(target, 1 - Math.pow(0.0004, dt));
+    followCam(dt);
     const W = fitup.W(), moved = !isIdentity(W) || state.work;
     if (moved) snapTools(s);
     s.weldPose(ctx, tipPos, dt, out);
@@ -658,6 +691,14 @@ export function startApp(STATIONS) {
     E.renderer.toneMappingExposure = THREE.MathUtils.lerp(E.renderer.toneMappingExposure, lensOn ? (sim.proc.lensExposure ?? 0.28) : 1.12, 1 - Math.pow(0.001, dt));
     updateHUD(out); haptics(d, mid, out);
     if (out.progress >= 0.999 && !sim.on && !w.done) { w.done = true; showToast('good', 'أحسنت! اضغط «افحص» لترى النتيجة.'); }
+  }
+  let camFollowOff = null;
+  function followCam(dt) {
+    if (!jointVertical() || E.tweening() || clean.active) { camFollowOff = null; return; }
+    if (!camFollowOff) camFollowOff = E.camera.position.clone().sub(E.controls.target);
+    const xs = THREE.MathUtils.clamp(tipPos.x, JOINT.x0 + 0.03, JOINT.x1 - 0.045);
+    const t = V3(xs, JOINT.y, JOINT.z).applyMatrix4(fitup.W());
+    E.controls.target.lerp(t, 1 - Math.pow(0.05, dt)); E.camera.position.copy(E.controls.target).add(camFollowOff);
   }
   // ---- two-thumb control (touch): left pad = travel along the joint, right pad = arc length (↕) + torch angle (↔)
   const sticks = { L: null, R: null };
@@ -1163,7 +1204,7 @@ export function startApp(STATIONS) {
   // ---------------------------------------------------------------- loop & boot
   E.onFrame(dt => {
     holdFrame(dt); clean && clean.frame(dt); tackFrame(dt);
-    { const st = S(); E.always = state.stage === 'weld' || !!hold || !!tack || !!(clean && clean.active) || state.stage === 'wear' || !!(st && st.animating && st.animating(ctx)) || explodeK > 0 && explodeK < 1;
+    { const st = S(); E.always = state.stage === 'weld' || !!hold || !!tack || !!tackTool || !!(clean && clean.active) || state.stage === 'wear' || !!(st && st.animating && st.animating(ctx)) || explodeK > 0 && explodeK < 1;
       E.glow = state.stage === 'weld' || state.stage === 'inspect' || !!(st && st.animating && st.animating(ctx)); }
     const s = S();
     if (state.stage === 'weld') weldFrame(dt);
